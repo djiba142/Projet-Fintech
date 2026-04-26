@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+@theme {
+  --color-navy: #0F172A;
+  --color-cobalt: #2563EB;
+  --color-emerald: #10B981;
+  --color-coral: #F43F5E;
+  --font-inter: "Inter", sans-serif;
+}
+
+@layer base {
+  body {
+    @apply font-inter bg-[#050d1a] text-slate-100 antialiased;
+    overflow-x: hidden;
+  }
+}
+
+.glass-card {
+  @apply bg-white/80 backdrop-blur-md border border-white/30 shadow-sm;
+}
