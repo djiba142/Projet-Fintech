@@ -827,7 +827,11 @@ const s = {
     width:"150px", backdropFilter:"blur(4px)",
   },
   phonePill: { display:"flex", flexDirection:"column", alignItems:"center", gap:"0.4rem" },
-  phoneLogo: { width:"44px", height:"30px", objectFit:"contain" },
+  phoneLogo: { 
+    width:"60px", height:"42px", objectFit:"contain", 
+    background:"rgba(255,255,255,0.08)", borderRadius:"8px", padding:"6px",
+    filter:"drop-shadow(0 4px 15px rgba(0,0,0,0.5))",
+  },
   phoneAmount: { color:"#f1f5f9", fontSize:"1.05rem", fontWeight:"700", fontFamily:"monospace", textAlign:"center" },
   phoneCurrency: { color:"#475569", fontSize:"0.72rem" },
   phoneBadge: { borderRadius:"12px", padding:"0.2rem 0.7rem", fontSize:"0.65rem", fontWeight:"700" },

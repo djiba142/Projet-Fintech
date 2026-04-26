@@ -181,13 +181,19 @@ export default function AgentDashboard() {
             <div style={s.detailsCard}>
               <p style={s.cardTitle}>DÉTAILS DES AVOIRS</p>
               <div style={s.balanceRow}>
-                <div>
-                  <p style={s.balLabel}>Orange Money</p>
-                  <p style={s.balValue}>{results?.consolidation?.orange_balance?.toLocaleString() || "0"} GNF</p>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.8rem" }}>
+                  <img src="/orange.png" style={s.opLogo} alt="Orange" />
+                  <div>
+                    <p style={s.balLabel}>Orange Money</p>
+                    <p style={s.balValue}>{results?.consolidation?.orange_balance?.toLocaleString() || "0"} GNF</p>
+                  </div>
                 </div>
-                <div>
-                  <p style={s.balLabel}>MTN MoMo</p>
-                  <p style={s.balValue}>{results?.consolidation?.mtn_balance?.toLocaleString() || "0"} GNF</p>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.8rem" }}>
+                  <img src="/mtn.png" style={s.opLogo} alt="MTN" />
+                  <div>
+                    <p style={s.balLabel}>MTN MoMo</p>
+                    <p style={s.balValue}>{results?.consolidation?.mtn_balance?.toLocaleString() || "0"} GNF</p>
+                  </div>
                 </div>
               </div>
               <div style={s.radarWrap}>
@@ -228,7 +234,11 @@ const s = {
   searchBox: { background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "16px", padding: "0.5rem 1rem", display: "flex", alignItems: "center", marginBottom: "1.5rem" },
   input: { background: "none", border: "none", color: "#fff", fontSize: "1.2rem", flex: 1, outline: "none", padding: "0.8rem" },
   opStatus: { display: "flex", gap: "0.8rem" },
-  opLogo: { width: "32px", height: "20px", objectFit: "contain" },
+  opLogo: { 
+    width: "48px", height: "32px", objectFit: "contain",
+    background: "rgba(255,255,255,0.05)", borderRadius: "6px", padding: "4px",
+    filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.4))",
+  },
   consentLabel: { display: "flex", alignItems: "center", gap: "0.8rem", color: "#64748b", fontSize: "0.9rem", marginBottom: "2rem", cursor: "pointer" },
   btnAction: { width: "100%", background: "#3b82f6", color: "#fff", border: "none", padding: "1.2rem", borderRadius: "12px", fontWeight: "900", cursor: "pointer", letterSpacing: "1px" },
   error: { color: "#ef4444", marginTop: "1rem", fontSize: "0.9rem" },
