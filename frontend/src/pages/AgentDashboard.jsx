@@ -80,12 +80,39 @@ export default function AgentDashboard() {
       if (!resp.ok) throw new Error(data.detail);
       
       const resM1 = await fetch(`${API}/m1/aggregate/${detected.orange || detected.mtn}`, {
-        headers: { Authorization: `Bearer ${data.access_token}` },
+        headers: { Authorization: `Bearer ${data.token}` },
       });
       const dataM1 = await resM1.json();
+      if (!resM1.ok) throw new Error(dataM1.detail);
       setResults(dataM1);
       setStep("result");
     } catch (e) { setError(e.message); }
+    finally { setLoading(false); }
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!results) return;
+    setLoading(true);
+    try {
+      const resp = await fetch(`${API}/export-pdf`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          client_name: results.kyc.fullname,
+          report_id: results.report_id,
+          msisdn_primary: detected.orange || detected.mtn,
+          credit_analysis: results.credit_analysis,
+          consolidation: results.consolidation
+        }),
+      });
+      if (!resp.ok) throw new Error("Erreur PDF");
+      const blob = await resp.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Kandjou_Rapport_${results.report_id}.pdf`;
+      a.click();
+    } catch (e) { setError("Erreur lors de la génération du PDF."); }
     finally { setLoading(false); }
   };
 
@@ -106,7 +133,7 @@ export default function AgentDashboard() {
         `}</style>
         {/* En-tête pour l'impression */}
         <div className="print-header">
-          <img src="/kandjou.png" alt="Logo" style={{ width: "60px" }} />
+          <span style={{ fontSize: "2rem", color: "#000" }}>◈</span>
           <div style={{ textAlign: "right" }}>
             <h1 style={{ margin: 0, fontSize: "1.2rem" }}>KANDJOU FINTECH</h1>
             <p style={{ margin: 0, fontSize: "0.7rem", color: "#64748b" }}>Rapport de Solvabilité Certifié — Guinée 2026</p>
@@ -163,59 +190,126 @@ export default function AgentDashboard() {
               VÉRIFIER LE CODE
             </button>
             <button onClick={() => setStep("idle")} style={s.btnBack}>Annuler</button>
+            {error && <p style={s.error}>{error}</p>}
           </div>
         )}
 
-        {step === "result" && (
-          <div style={s.resultGrid}>
-            <div style={s.scoreCard}>
-              <p style={s.cardTitle}>KANDJOU SCORE</p>
-              <div style={{...s.scoreCircle, borderColor: col}}>
-                <span style={{...s.scoreValue, color: col}}>{score}</span>
-                <span style={s.scoreMax}>/100</span>
+        {step === "result" && results && (
+          <div style={s.resultPage}>
+            {/* Header Institutionnel */}
+            <div style={s.resHeader}>
+              <div>
+                <h1 style={s.resTitle}>RAPPORT D'ÉVALUATION DE CRÉDIT</h1>
+                <p style={s.resSubtitle}>ID Dossier: {results.report_id} • Statut: Analyse Certifiée</p>
               </div>
-              <p style={{...s.status, color: col}}>{results?.credit_analysis?.status || "APPROUVÉ"}</p>
-              <button onClick={() => window.print()} style={s.btnPDF}>Télécharger le PDF</button>
-            </div>
-            
-            <div style={s.detailsCard}>
-              <p style={s.cardTitle}>DÉTAILS DES AVOIRS</p>
-              <div style={s.balanceRow}>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.8rem" }}>
-                  <img src="/orange.png" style={s.opLogo} alt="Orange" />
-                  <div>
-                    <p style={s.balLabel}>Orange Money</p>
-                    <p style={s.balValue}>{results?.consolidation?.orange_balance?.toLocaleString() || "0"} GNF</p>
-                  </div>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.8rem" }}>
-                  <img src="/mtn.png" style={s.opLogo} alt="MTN" />
-                  <div>
-                    <p style={s.balLabel}>MTN MoMo</p>
-                    <p style={s.balValue}>{results?.consolidation?.mtn_balance?.toLocaleString() || "0"} GNF</p>
-                  </div>
-                </div>
-              </div>
-              <div style={s.radarWrap}>
-                 <ResponsiveContainer width="100%" height="100%">
-                    <RadarChart data={RADAR_DATA}>
-                      <PolarGrid stroke="#334155" />
-                      <PolarAngleAxis dataKey="s" tick={{fill: "#64748b", fontSize: 10}} />
-                      <Radar dataKey="A" stroke={col} fill={col} fillOpacity={0.3} />
-                    </RadarChart>
-                 </ResponsiveContainer>
-              </div>
+              <button onClick={() => setStep("idle")} style={s.btnNewDossier}>NOUVEAU DOSSIER</button>
             </div>
 
-            <div style={s.auditCard}>
-              <p style={s.cardTitle}>LOGS D'AUDIT LOCAUX</p>
-              {AUDIT_LOGS.map((log, i) => (
-                <div key={i} style={s.logRow}>
-                  <span style={s.logTime}>{log.heure}</span>
-                  <span style={s.logTarget}>{log.cible}</span>
-                  <span style={s.logRes}>{log.resultat}</span>
+            <div style={s.resGrid}>
+              {/* Colonne Gauche: KYC & Score */}
+              <div style={s.resCol1}>
+                {/* KYC Profile */}
+                <div style={s.kycCard}>
+                  <div style={s.avatarLarge}>
+                    <svg width="40" height="40" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <h2 style={s.clientName}>{results.kyc.fullname}</h2>
+                    <p style={s.clientMeta}>ID: {results.kyc.id_card} • {results.kyc.nationality}</p>
+                    <p style={s.clientMeta}>Orange: {results.msisdn_orange || "N/A"} • MTN: {results.msisdn_mtn || "N/A"}</p>
+                    <div style={s.kycBadge}>KYC VÉRIFIÉ (M3 VAULT)</div>
+                  </div>
                 </div>
-              ))}
+
+                {/* Global Score Gauge */}
+                <div style={s.scoreCardBig}>
+                  <h3 style={s.cardLabel}>KANDJOU FINTECH SCORE</h3>
+                  <div style={{...s.gauge, borderTopColor: results.credit_analysis.score >= 70 ? "#10B981" : "#ef4444", borderRightColor: results.credit_analysis.score >= 70 ? "#10B981" : "#1e293b"}}>
+                    <span style={s.scoreValue}>{results.credit_analysis.score}</span>
+                    <span style={s.scoreMax}>/100</span>
+                  </div>
+                  <div style={{...s.statusBadge, background: results.credit_analysis.score >= 70 ? "rgba(16,185,129,0.1)" : "rgba(239,68,68,0.1)", color: results.credit_analysis.score >= 70 ? "#10B981" : "#ef4444"}}>
+                    {results.credit_analysis.status} - RISQUE {results.credit_analysis.risk_level}
+                  </div>
+                </div>
+
+                {/* Recommandation & PDF */}
+                <div style={s.recCard}>
+                  <h3 style={s.cardLabel}>RECOMMANDATION</h3>
+                  <div style={{ background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)", padding: "0.8rem", borderRadius: "8px", marginBottom: "1rem", color: "#f59e0b", fontSize: "0.8rem", fontWeight: "bold" }}>
+                    ⚠️ Profil à surveiller. Analyse complémentaire recommandée avant décision de crédit.
+                  </div>
+                  <p style={s.recText}>{results.credit_analysis.recommendation}</p>
+                  <button onClick={handleDownloadPDF} style={s.btnPdf}>
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{marginRight:8}}><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    TÉLÉCHARGER LE PDF CERTIFIÉ
+                  </button>
+                </div>
+
+                {/* QR Verification Card */}
+                <div style={s.verifyCard}>
+                  <div style={s.qrBox}>
+                    <img 
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://kandjou.gn/verify/${results.report_id}`} 
+                      alt="QR Code" 
+                      style={s.qrImg} 
+                    />
+                  </div>
+                  <div>
+                    <h4 style={s.verifyTitle}>AUTHENTICITÉ CERTIFIÉE</h4>
+                    <p style={s.verifyDesc}>Scannez pour vérifier l'intégrité du rapport sur le registre public Kandjou.</p>
+                    <code style={s.verifyCode}>{results.report_id}</code>
+                  </div>
+                </div>
+              </div>
+
+              {/* Colonne Droite: Graphiques & Détails */}
+              <div style={s.resCol2}>
+                <div style={s.detailsGrid}>
+                  <div style={s.assetsCard}>
+                    <h3 style={s.cardLabel}>RÉSUMÉ DES AVOIRS CONSOLIDÉS</h3>
+                    <div style={s.assetRow}>
+                      <span style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}><img src="/orange.png" width="16" /> Orange Money</span>
+                      <strong>{results.consolidation.orange_balance?.toLocaleString()} GNF</strong>
+                    </div>
+                    <div style={s.assetRow}>
+                      <span style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}><img src="/mtn.png" width="16" /> MTN MoMo</span>
+                      <strong>{results.consolidation.mtn_balance?.toLocaleString()} GNF</strong>
+                    </div>
+                    <div style={s.assetTotal}>
+                      <span>Total Liquidité</span>
+                      <span style={s.totalValue}>{results.consolidation.total_balance?.toLocaleString()} GNF</span>
+                    </div>
+                  </div>
+
+                  <div style={s.radarCard}>
+                    <h3 style={s.cardLabel}>RADAR DE SOLVABILITÉ</h3>
+                    <div style={s.chartBox}>
+                      <ResponsiveContainer width="100%" height={200}>
+                        <RadarChart data={RADAR_DATA}>
+                          <PolarGrid stroke="#334155" />
+                          <PolarAngleAxis dataKey="s" tick={{fill: "#94a3b8", fontSize: 10}} />
+                          <Radar name="Score" dataKey="A" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.5} />
+                        </RadarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Historique / Activité */}
+                <div style={s.activityCard}>
+                  <h3 style={s.cardLabel}>FLUX TRANSACTIONNELS (3 DERNIERS MOIS)</h3>
+                  <div style={s.chartBoxLarge}>
+                    <ResponsiveContainer width="100%" height={150}>
+                      <BarChart data={TREND_DATA}>
+                        <XAxis dataKey="n" hide />
+                        <Tooltip contentStyle={{background: "#1e293b", border: "none", borderRadius: 8}} />
+                        <Bar dataKey="v" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -225,41 +319,69 @@ export default function AgentDashboard() {
 }
 
 const s = {
-  page: { padding: "2rem", color: "#fff", background: "#0a1628", height: "100vh" },
+  page: { padding: "2rem", color: "#fff", background: "transparent", minHeight: "100vh" },
   header: { display: "flex", justifyContent: "space-between", marginBottom: "2rem" },
   title: { fontSize: "1.5rem", fontWeight: "900", margin: 0 },
   subtitle: { color: "#64748b", fontSize: "0.85rem" },
-  btnReset: { background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "#fff", padding: "0.5rem 1rem", borderRadius: "8px", cursor: "pointer" },
   searchSection: { maxWidth: "600px", margin: "4rem auto", textAlign: "center" },
-  searchBox: { background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "16px", padding: "0.5rem 1rem", display: "flex", alignItems: "center", marginBottom: "1.5rem" },
+  searchBox: { background: "rgba(255,255,255,0.03)", border: "1px solid #1E293B", borderRadius: "16px", padding: "0.5rem 1rem", display: "flex", alignItems: "center", marginBottom: "1.5rem" },
   input: { background: "none", border: "none", color: "#fff", fontSize: "1.2rem", flex: 1, outline: "none", padding: "0.8rem" },
   opStatus: { display: "flex", gap: "0.8rem" },
-  opLogo: { 
-    width: "48px", height: "32px", objectFit: "contain",
-    background: "rgba(255,255,255,0.05)", borderRadius: "6px", padding: "4px",
-    filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.4))",
-  },
+  opLogo: { width: "48px", height: "32px", objectFit: "contain", background: "rgba(255,255,255,0.05)", borderRadius: "6px", padding: "4px" },
   consentLabel: { display: "flex", alignItems: "center", gap: "0.8rem", color: "#64748b", fontSize: "0.9rem", marginBottom: "2rem", cursor: "pointer" },
   btnAction: { width: "100%", background: "#3b82f6", color: "#fff", border: "none", padding: "1.2rem", borderRadius: "12px", fontWeight: "900", cursor: "pointer", letterSpacing: "1px" },
   error: { color: "#ef4444", marginTop: "1rem", fontSize: "0.9rem" },
   otpSection: { maxWidth: "400px", margin: "4rem auto", textAlign: "center" },
-  otpInput: { background: "#0f172a", border: "2px solid #1e293b", color: "#fff", fontSize: "2rem", textAlign: "center", padding: "1rem", borderRadius: "12px", width: "100%", marginBottom: "1.5rem", letterSpacing: "10px" },
+  otpInput: { background: "#0f172a", border: "2px solid #1E293B", color: "#fff", fontSize: "2rem", textAlign: "center", padding: "1rem", borderRadius: "12px", width: "100%", marginBottom: "1.5rem", letterSpacing: "10px" },
   btnBack: { background: "none", border: "none", color: "#64748b", marginTop: "1rem", cursor: "pointer" },
-  resultGrid: { display: "grid", gridTemplateColumns: "1fr 1.5fr 1fr", gap: "1.5rem", height: "calc(100vh - 150px)" },
-  scoreCard: { background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "20px", padding: "2rem", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" },
-  scoreCircle: { width: "160px", height: "160px", borderRadius: "50%", border: "10px solid", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", margin: "2rem 0" },
-  scoreValue: { fontSize: "3.5rem", fontWeight: "900" },
-  scoreMax: { fontSize: "0.8rem", opacity: 0.3 },
-  status: { fontWeight: "900", letterSpacing: "2px", marginBottom: "2rem" },
-  btnPDF: { background: "#fff", color: "#000", border: "none", padding: "0.8rem 1.5rem", borderRadius: "8px", fontWeight: "bold", cursor: "pointer" },
-  detailsCard: { background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "20px", padding: "2rem" },
-  balanceRow: { display: "flex", justifyContent: "space-between", marginBottom: "2rem" },
-  balLabel: { fontSize: "0.7rem", color: "#475569", fontWeight: "bold" },
-  balValue: { fontSize: "1.2rem", fontWeight: "bold" },
-  radarWrap: { height: "250px" },
-  auditCard: { background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "20px", padding: "1.5rem", overflow: "auto" },
-  logRow: { display: "flex", justifyContent: "space-between", fontSize: "0.75rem", padding: "0.8rem 0", borderBottom: "1px solid rgba(255,255,255,0.03)" },
-  logTime: { color: "#475569" },
-  logTarget: { color: "#94a3b8", fontFamily: "monospace" },
-  cardTitle: { fontSize: "0.7rem", fontWeight: "bold", color: "#475569", letterSpacing: "1px", marginBottom: "1rem" }
+  
+  resultPage: { background: "transparent", minHeight: "100vh", color: "#e2e8f0", animation: "fadeIn 0.5s ease-out" },
+  resHeader: { borderBottom: "1px solid #1E293B", paddingBottom: "1rem", marginBottom: "2rem", display: "flex", justifyContent: "space-between", alignItems: "center" },
+  resTitle: { fontSize: "1.5rem", fontWeight: "bold", color: "#fff", letterSpacing: "1px", margin: 0 },
+  resSubtitle: { color: "#64748b", fontSize: "0.8rem", marginTop: "0.25rem" },
+  btnNewDossier: { background: "rgba(255,255,255,0.05)", border: "1px solid #1E293B", color: "#fff", padding: "0.6rem 1.2rem", borderRadius: "8px", cursor: "pointer", fontWeight: "bold", fontSize: "0.8rem" },
+  
+  resGrid: { display: "grid", gridTemplateColumns: "1fr 2fr", gap: "2rem" },
+  resCol1: { display: "flex", flexDirection: "column", gap: "1.5rem" },
+  resCol2: { display: "flex", flexDirection: "column", gap: "1.5rem" },
+  
+  kycCard: { background: "#151C2C", border: "1px solid #1E293B", borderRadius: "16px", padding: "1.5rem", display: "flex", alignItems: "center", gap: "1.5rem" },
+  avatarLarge: { width: "80px", height: "80px", borderRadius: "12px", background: "#1E293B", display: "flex", alignItems: "center", justifyContent: "center", color: "#475569" },
+  clientName: { color: "#fff", fontSize: "1.2rem", margin: 0, fontWeight: "bold" },
+  clientMeta: { color: "#64748b", fontSize: "0.8rem", margin: "0.25rem 0" },
+  kycBadge: { background: "rgba(59,130,246,0.1)", color: "#3b82f6", fontSize: "0.7rem", padding: "0.2rem 0.6rem", borderRadius: "4px", fontWeight: "bold", border: "1px solid rgba(59,130,246,0.2)" },
+  
+  scoreCardBig: { background: "#151C2C", border: "1px solid #1E293B", borderRadius: "16px", padding: "2rem", textAlign: "center" },
+  cardLabel: { color: "#64748b", fontSize: "0.7rem", fontWeight: "bold", letterSpacing: "2px", marginBottom: "1.5rem", textAlign: "left", textTransform: "uppercase" },
+  gauge: { 
+    width: "180px", height: "180px", borderRadius: "50%", margin: "0 auto", border: "8px solid #1E293B", 
+    display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+    boxShadow: "0 0 40px rgba(0,0,0,0.3)"
+  },
+  scoreValue: { fontSize: "3.5rem", fontWeight: "bold", color: "#fff" },
+  scoreMax: { fontSize: "1rem", color: "#475569" },
+  statusBadge: { marginTop: "1.5rem", padding: "0.5rem 1rem", borderRadius: "99px", fontSize: "0.8rem", fontWeight: "bold", letterSpacing: "1px" },
+  
+  recCard: { background: "#151C2C", border: "1px solid #1E293B", borderRadius: "16px", padding: "1.5rem" },
+  recText: { color: "#94a3b8", fontSize: "0.9rem", lineHeight: "1.6", marginBottom: "1.5rem" },
+  btnPdf: { width: "100%", background: "#0066FF", color: "#fff", border: "none", padding: "1rem", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s" },
+  
+  verifyCard: { background: "rgba(30, 41, 59, 0.4)", border: "1px solid #1E293B", borderRadius: "16px", padding: "1.2rem", display: "flex", alignItems: "center", gap: "1rem", backdropFilter: "blur(10px)" },
+  qrBox: { background: "#fff", padding: "4px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center" },
+  qrImg: { width: "60px", height: "60px" },
+  verifyTitle: { fontSize: "0.7rem", fontWeight: "900", color: "#3b82f6", margin: 0, letterSpacing: "1px" },
+  verifyDesc: { fontSize: "0.65rem", color: "#64748b", margin: "0.2rem 0", lineHeight: "1.4" },
+  verifyCode: { fontSize: "0.6rem", color: "#475569", background: "#0B1120", padding: "2px 6px", borderRadius: "4px", fontFamily: "monospace" },
+  
+  detailsGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" },
+  assetsCard: { background: "#151C2C", border: "1px solid #1E293B", borderRadius: "16px", padding: "1.5rem" },
+  assetRow: { display: "flex", justifyContent: "space-between", padding: "1rem", borderBottom: "1px solid #1E293B", fontSize: "0.9rem" },
+  assetTotal: { display: "flex", justifyContent: "space-between", padding: "1.2rem 1rem", fontSize: "1rem", fontWeight: "bold" },
+  totalValue: { color: "#3b82f6" },
+  
+  radarCard: { background: "#151C2C", border: "1px solid #1E293B", borderRadius: "16px", padding: "1.5rem" },
+  chartBox: { background: "#0B1120", borderRadius: "12px", padding: "1rem", border: "1px dashed #1E293B" },
+  
+  activityCard: { background: "#151C2C", border: "1px solid #1E293B", borderRadius: "16px", padding: "1.5rem" },
+  chartBoxLarge: { background: "#0B1120", borderRadius: "12px", padding: "1rem", border: "1px dashed #1E293B", minHeight: "150px" }
 };

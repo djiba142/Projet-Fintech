@@ -13,7 +13,8 @@ class ScoringStrategy(ABC):
     def calculate(
         self, 
         sources: List[OperatorSource], 
-        utility_sources: Optional[List[UtilitySource]] = None
+        utility_sources: Optional[List[UtilitySource]] = None,
+        threshold: Optional[int] = None
     ) -> CreditAnalysis:
         """
         Calcule le score de crédit basé sur les sources fournies.

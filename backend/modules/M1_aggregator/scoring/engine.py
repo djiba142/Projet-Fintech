@@ -48,7 +48,8 @@ class ScoringEngine:
     def run(
         self, 
         sources: List[OperatorSource],
-        utility_sources: Optional[List[UtilitySource]] = None
+        utility_sources: Optional[List[UtilitySource]] = None,
+        threshold: Optional[int] = None
     ) -> CreditAnalysis:
         """
         Exécute le calcul de scoring.
@@ -56,6 +57,7 @@ class ScoringEngine:
         Args:
             sources: Sources normalisées (1 ou 2 opérateurs).
             utility_sources: Sources facturation (EDG...). Optionnel.
+            threshold: Seuil d'éligibilité minimal (persisté). Optionnel.
 
         Returns:
             CreditAnalysis avec score, statut et recommandation.
@@ -63,7 +65,7 @@ class ScoringEngine:
         if not sources and not utility_sources:
             raise ValueError("Impossible de calculer un score sans sources de données.")
 
-        result = self._strategy.calculate(sources, utility_sources)
+        result = self._strategy.calculate(sources, utility_sources, threshold=threshold)
 
         # Log structuré pour audit
         total_telco = sum(s.balance for s in sources)

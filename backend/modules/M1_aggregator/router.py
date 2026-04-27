@@ -6,7 +6,8 @@ from datetime import datetime
 from typing import List, Optional, Dict
 
 from dotenv import load_dotenv
-from fastapi import APIRouter, HTTPException, Path, Request, Depends, Header, Query, status
+from fastapi import APIRouter, HTTPException, Path, Request, Depends, Header, Query, status, Body
+import httpx
 
 # Importation directe des fonctions des autres modules pour éviter les boucles HTTP
 from modules.M2_simulators.router import get_orange_balance, get_mtn_balance
@@ -22,6 +23,7 @@ from .models import (
     UtilitySource
 )
 from .scoring.engine import ScoringEngine
+from modules.common.database import get_risk_threshold, set_risk_threshold, log_event
 
 # Load environment variables
 load_dotenv()
@@ -37,19 +39,24 @@ async def require_valid_token(authorization: Optional[str] = Header(None)) -> Di
     """
     Valide le token directement en consultant ACTIVE_SESSIONS de M3.
     """
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Token Kandjou manquant")
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Format de token invalide (Bearer requis)")
     
-    # Accès direct à la mémoire de M3
-    session = ACTIVE_SESSIONS.get(authorization)
+    token = authorization.split(" ")[1]
+    
+    # Accès direct aux sessions partagées de M3
+    from modules.M3_security.router import ACTIVE_SESSIONS
+    session = ACTIVE_SESSIONS.get(token)
+    
     if not session:
+        logger.warning(f"⚠️ Tentative d'accès avec token invalide : {token}")
         raise HTTPException(status_code=401, detail="Token Kandjou invalide ou expiré")
     
-    # Vérification d'expiration si applicable
-    if "expires_at" in session:
-        expiry = datetime.fromisoformat(session["expires_at"])
-        if datetime.now() > expiry:
-            del ACTIVE_SESSIONS[authorization]
+    # Vérification d'expiration
+    expiry_str = session.get("expires_at")
+    if expiry_str:
+        if datetime.now() > datetime.fromisoformat(expiry_str):
+            if token in ACTIVE_SESSIONS: del ACTIVE_SESSIONS[token]
             raise HTTPException(status_code=401, detail="Token Kandjou expiré")
 
     return {
@@ -131,6 +138,15 @@ async def health_check():
         "timestamp": datetime.now().isoformat()
     }
 
+@router.get("/risk/threshold")
+async def get_threshold():
+    return {"threshold": get_risk_threshold()}
+
+@router.post("/risk/threshold")
+async def update_threshold(threshold: int = Body(..., embed=True)):
+    set_risk_threshold(threshold)
+    return {"message": "Seuil mis à jour avec succès", "new_threshold": threshold}
+
 # --- Logique de Scoring Dynamique ---
 def calculate_score(orange_score: int, mtn_score: int, policy):
     # Pondération dynamique
@@ -153,7 +169,7 @@ def calculate_score(orange_score: int, mtn_score: int, policy):
         
     return final_score, risk_level, rec
 
-@router.post("/aggregate/{msisdn}")
+@router.get("/aggregate/{msisdn}")
 async def aggregate(
     msisdn: str,
     strategy: str = Query("v1", description="Strategie de scoring"),
@@ -188,28 +204,51 @@ async def aggregate(
             detail=f"Aucune donnée trouvée pour le client {primary}."
         )
     
+    # Récupération du seuil persistant
+    current_threshold = get_risk_threshold()
+    
     # Scoring inline
     engine = ScoringEngine(strategy=strategy)
-    credit_analysis = engine.run(sources, None)
+    credit_analysis = engine.run(sources, None, threshold=current_threshold)
     
-    # Construction de la réponse consolidée
     total_balance = sum(s.balance for s in sources)
     active_sources = [s.operator for s in sources]
     
-    result = AggregatedResponse(
-        client_id=primary,
-        consolidation=Consolidation(
-            total_balance=total_balance,
-            currency="GNF",
-            sources_active=active_sources,
-            orange_balance=next((s.balance for s in sources if s.operator == "ORANGE"), None),
-            mtn_balance=next((s.balance for s in sources if s.operator == "MTN"), None),
-            utility_data_present=False
-        ),
-        credit_analysis=credit_analysis,
-        timestamp=datetime.utcnow()
+    # Génération d'un ID de rapport unique (Authenticité)
+    import hashlib
+    report_id = f"KDJ-{datetime.now().strftime('%Y%m%d')}-{hashlib.md5(msisdn.encode()).hexdigest()[:4].upper()}"
+    
+    # Données KYC Simulées (viendraient de M2 en production)
+    kyc_data = {
+        "fullname": "Mamadou Alimou DIALLO",
+        "id_card": "GN-ID-2024-8891-B",
+        "nationality": "Guinéenne",
+        "operator": "Orange Money" if msisdn.startswith("62") else "MTN MoMo"
+    }
+
+    result = {
+        "report_id": report_id,
+        "kyc": kyc_data,
+        "client_id": primary,
+        "msisdn_orange": msisdn_orange,
+        "msisdn_mtn": msisdn_mtn,
+        "consolidation": {
+            "total_balance": total_balance,
+            "currency": "GNF",
+            "sources_active": active_sources,
+            "orange_balance": next((s.balance for s in sources if s.operator == "ORANGE"), 0),
+            "mtn_balance": next((s.balance for s in sources if s.operator == "MTN"), 0),
+        },
+        "credit_analysis": credit_analysis.dict(),
+        "timestamp": datetime.utcnow().isoformat()
+    }
+    
+    log_event(
+        user_id="agent",
+        action="SCORING_AGGREGATION",
+        target=primary,
+        result=credit_analysis.status,
+        details=f"ReportID: {report_id} | Score: {credit_analysis.score}"
     )
     
-    logger.info(f"✅ Agrégation terminée pour {primary} → Score: {credit_analysis.score}")
-    
-    return result.dict()
+    return result

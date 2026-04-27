@@ -1,5 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import axios from "axios";
 import MainLayout from "../components/MainLayout";
+
+const API_BASE = "http://localhost:8000/m1";
 
 function LineChart({ data }) {
   const W = 600, H = 160, PAD = { top: 16, right: 20, bottom: 32, left: 36 };
@@ -47,6 +50,33 @@ function LineChart({ data }) {
 
 export default function RiskDashboard() {
   const [threshold, setThreshold] = useState(65);
+  const [syncing, setSyncing] = useState(false);
+
+  useEffect(() => {
+    // Charger le seuil depuis le backend
+    const fetchThreshold = async () => {
+      try {
+        const res = await axios.get(`${API_BASE}/risk/threshold`);
+        setThreshold(res.data.threshold);
+      } catch (err) {
+        console.error("Erreur lors du chargement du seuil :", err);
+      }
+    };
+    fetchThreshold();
+  }, []);
+
+  const handleThresholdChange = async (val) => {
+    setThreshold(val);
+    setSyncing(true);
+    try {
+      await axios.post(`${API_BASE}/risk/threshold`, { threshold: val });
+    } catch (err) {
+      console.error("Erreur lors de la mise à jour du seuil :", err);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const WEEK_DATA = [
     { jour: "Lun", score: 45 }, { jour: "Mar", score: 52 }, { jour: "Mer", score: 48 },
     { jour: "Jeu", score: 62 }, { jour: "Ven", score: 58 }, { jour: "Sam", score: 70 }, { jour: "Dim", score: 75 }
@@ -97,7 +127,7 @@ export default function RiskDashboard() {
             </div>
             <div style={s.sliderLabelRow}>
               <div>
-                <p style={s.sliderName}>Seuil de Scoring Minimal</p>
+                <p style={s.sliderName}>Seuil de Scoring Minimal {syncing && <span style={{ fontSize: "0.6rem", color: "#3b82f6", fontWeight: "normal" }}>(Synchronisation...)</span>}</p>
                 <p style={s.sliderDesc}>Détermine l'éligibilité automatique des dossiers</p>
               </div>
               <div style={{ ...s.sliderValue, color: sliderColor }}>{threshold}</div>
@@ -106,7 +136,7 @@ export default function RiskDashboard() {
               <div style={s.sliderTrackBg}>
                 <div style={{ ...s.sliderFill, width: `${threshold}%`, background: sliderColor }} />
               </div>
-              <input type="range" min="0" max="100" value={threshold} onChange={e => setThreshold(Number(e.target.value))} style={s.sliderInput} />
+              <input type="range" min="0" max="100" value={threshold} onChange={e => handleThresholdChange(Number(e.target.value))} style={s.sliderInput} />
             </div>
             <div style={s.sliderTooltip}>
               Les dossiers avec un score inférieur à <strong>{threshold}</strong> seront rejetés.
@@ -131,34 +161,34 @@ export default function RiskDashboard() {
 }
 
 const s = {
-  page: { padding: "2rem", color: "#fff" },
+  page: { padding: "2rem", color: "#fff", background: "transparent" },
   header: { marginBottom: "1.5rem" },
   title: { fontSize: "1.5rem", fontWeight: "900", margin: 0 },
   subtitle: { color: "#64748b", fontSize: "0.85rem" },
   kpiGrid: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1rem", marginBottom: "1.5rem" },
-  kpiCard: { background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "12px", padding: "1.2rem" },
+  kpiCard: { background: "#151C2C", border: "1px solid #1E293B", borderRadius: "12px", padding: "1.2rem" },
   kpiIcon: { color: "#3b82f6", fontSize: "1.2rem", marginBottom: "0.5rem" },
   kpiValue: { fontSize: "1.8rem", fontWeight: "900" },
   kpiLabel: { fontSize: "0.65rem", fontWeight: "bold", color: "#475569", letterSpacing: "1px" },
   sectionTitle: { fontSize: "0.7rem", fontWeight: "bold", color: "#475569", letterSpacing: "1px" },
-  chartCard: { background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "16px", padding: "1.5rem", marginBottom: "1.5rem" },
+  chartCard: { background: "#151C2C", border: "1px solid #1E293B", borderRadius: "16px", padding: "1.5rem", marginBottom: "1.5rem" },
   thresholdGrid: { display: "grid", gridTemplateColumns: "1fr 300px", gap: "1.5rem" },
-  sliderCard: { background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "1.5rem" },
+  sliderCard: { background: "#151C2C", border: "1px solid #1E293B", borderRadius: "16px", padding: "1.5rem" },
   sliderHeader: { marginBottom: "1.5rem" },
   sliderLabelRow: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" },
   sliderName: { fontSize: "0.9rem", fontWeight: "bold", margin: 0 },
   sliderDesc: { fontSize: "0.75rem", color: "#64748b", margin: 0 },
   sliderValue: { fontSize: "2.5rem", fontWeight: "900" },
-  sliderTrackWrap: { position: "relative", height: "8px", background: "rgba(255,255,255,0.05)", borderRadius: "4px" },
+  sliderTrackWrap: { position: "relative", height: "8px", background: "#0B1120", borderRadius: "4px" },
   sliderTrackBg: { height: "100%", borderRadius: "4px", overflow: "hidden" },
   sliderFill: { height: "100%", transition: "width 0.1s" },
   sliderInput: { position: "absolute", top: "-6px", left: 0, width: "100%", opacity: 0, cursor: "pointer" },
   sliderTooltip: { marginTop: "1.5rem", padding: "1rem", background: "rgba(255,255,255,0.02)", borderRadius: "8px", fontSize: "0.8rem", color: "#94a3b8" },
-  impactCard: { background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "1.5rem", textAlign: "center" },
+  impactCard: { background: "#151C2C", border: "1px solid #1E293B", borderRadius: "16px", padding: "1.5rem", textAlign: "center" },
   impactLabel: { fontSize: "0.65rem", fontWeight: "bold", color: "#475569", letterSpacing: "1px", marginBottom: "1rem" },
   impactValue: { fontSize: "3.5rem", fontWeight: "900", marginBottom: "0.5rem" },
   impactSubLabel: { fontSize: "0.75rem", color: "#64748b", marginBottom: "1rem" },
-  miniGauge: { height: "6px", background: "rgba(255,255,255,0.05)", borderRadius: "3px", overflow: "hidden", marginBottom: "1rem" },
+  miniGauge: { height: "6px", background: "#0B1120", borderRadius: "3px", overflow: "hidden", marginBottom: "1rem" },
   miniGaugeFill: { height: "100%", transition: "width 0.3s" },
   impactWarning: { fontSize: "0.7rem", fontWeight: "bold" }
 };

@@ -2,3 +2,8 @@
 __pycache__/
 .pytest_cache/
 *.pyc
+node_modules/
+database.sqlite
+dist/
+.DS_Store
+*.log

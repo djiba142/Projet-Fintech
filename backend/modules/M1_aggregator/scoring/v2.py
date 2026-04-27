@@ -38,7 +38,8 @@ class V2ScoringStrategy(ScoringStrategy):
     def calculate(
         self, 
         sources: List[OperatorSource], 
-        utility_sources: Optional[List[UtilitySource]] = None
+        utility_sources: Optional[List[UtilitySource]] = None,
+        threshold: Optional[int] = None
     ) -> CreditAnalysis:
         total = sum(s.balance for s in sources)
         score = self.base_score
@@ -75,7 +76,7 @@ class V2ScoringStrategy(ScoringStrategy):
         score = max(0, min(100, score))
 
         # ── Déterminer statut et recommandation ──────────────────────────
-        status, recommendation = self._interpret(score, total)
+        status, recommendation = self._interpret(score, total, threshold=threshold)
 
         return CreditAnalysis(
             score=score,
@@ -84,8 +85,11 @@ class V2ScoringStrategy(ScoringStrategy):
         )
 
     @staticmethod
-    def _interpret(score: int, total: float) -> tuple[str, str]:
-        if score >= 71:
+    def _interpret(score: int, total: float, threshold: Optional[int] = None) -> tuple[str, str]:
+        # Utilisation du seuil dynamique (défaut 71 si non fourni)
+        min_eligible = threshold if threshold is not None else 71
+        
+        if score >= min_eligible:
             cap = int(total * 0.35)  # Légère bonification de confiance dans V2 (35% au lieu de 30%)
             return (
                 "ELIGIBLE",

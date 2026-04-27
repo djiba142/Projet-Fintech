@@ -1,10 +1,11 @@
 import logging
 from datetime import datetime, timedelta
 from typing import Optional, Dict, List
-from fastapi import APIRouter, HTTPException, Request, Body, status
+from fastapi import APIRouter, HTTPException, Request, Body, status, Query
 from pydantic import BaseModel
 
 from .utils import OTPStorage, generate_secure_token
+from modules.common.database import get_user_by_username, log_event
 
 # --- Configuration du logger local ---
 logger = logging.getLogger("security_vault")
@@ -12,12 +13,7 @@ logger = logging.getLogger("security_vault")
 router = APIRouter()
 
 # --- Base de données Utilisateurs (Simulée) ---
-USERS_DB = [
-    {"id": 1, "username": "djiba", "password": "password123", "role": "ADMIN", "fullname": "Djiba Kourouma", "status": "active", "last_login": "2026-04-24 14:00"},
-    {"id": 2, "username": "agent_01", "password": "agentpassword", "role": "AGENT", "fullname": "Abdoulaye Diallo", "status": "active", "last_login": "2026-04-24 15:30"},
-    {"id": 3, "username": "risk_boss", "password": "riskpassword", "role": "RISK_MANAGER", "fullname": "Mariama Barry", "status": "active", "last_login": "2026-04-24 12:45"},
-    {"id": 4, "username": "stagiaire_01", "password": "stg", "role": "AGENT", "fullname": "Moussa Camara", "status": "suspended", "last_login": "2026-04-23 09:00"}
-]
+# Les utilisateurs sont désormais gérés via SQLite (modules/common/database.py)
 
 # --- Alertes Sécurité (Simulées) ---
 SECURITY_ALERTS = [
@@ -46,7 +42,8 @@ ACTIVE_SESSIONS: Dict[str, Dict] = {} # Token -> UserData
 
 @router.post("/auth/login")
 async def login(req: LoginRequest):
-    user = next((u for u in USERS_DB if u["username"] == req.username), None)
+    user = get_user_by_username(req.username)
+    
     if not user or user["password"] != req.password:
         logger.warning(f"❌ Échec de connexion : {req.username}")
         raise HTTPException(status_code=401, detail="Identifiants invalides")
@@ -64,6 +61,7 @@ async def login(req: LoginRequest):
     }
     ACTIVE_SESSIONS[token] = session_data
     
+    log_event(req.username, "LOGIN_SUCCESS", result="SUCCESS", details=f"Rôle: {user['role']}")
     logger.info(f"✅ Connexion réussie : {req.username} (Rôle: {user['role']})")
     return {"token": token, "role": user["role"], "fullname": user["fullname"]}
 
@@ -73,29 +71,38 @@ async def request_otp(req: OTPRequest):
         raise HTTPException(status_code=400, detail="Au moins un numéro est requis")
     
     session_id, code = otp_manager.create_session(req.msisdn_orange, req.msisdn_mtn)
+    log_event("system", "OTP_REQUEST", target=f"{req.msisdn_orange or 'N/A'}/{req.msisdn_mtn or 'N/A'}", details=f"Session ID: {session_id}")
     logger.info(f"🔑 OTP généré pour {req.msisdn_orange or 'N/A'} / {req.msisdn_mtn or 'N/A'} | Code: {code}")
     return {"session_id": session_id, "message": "OTP envoyé (simulé)"}
 
 @router.post("/auth/verify-otp")
 async def verify_otp(req: OTPVerify):
-    session = otp_manager.verify_code(req.session_id, req.code)
-    if not session:
-        raise HTTPException(status_code=400, detail="Code invalide ou session expirée")
+    status = otp_manager.verify_otp(req.session_id, req.code)
+    if status != "VALID":
+        logger.warning(f"❌ Échec OTP pour session {req.session_id} : {status}")
+        if status == "BLOCKED":
+            raise HTTPException(status_code=429, detail="Trop de tentatives. Session bloquée.")
+        raise HTTPException(status_code=400, detail=f"Code invalide ou session expirée ({status})")
     
+    session_data = otp_manager.get_session_data(req.session_id)
     token = generate_secure_token()
+    
     # Le token d'accès temporaire pour M1
     access_token = f"KANDJOU_ACCESS_{token}"
     ACTIVE_SESSIONS[access_token] = {
         "type": "scoring_access",
-        "msisdn_orange": session["msisdn_orange"],
-        "msisdn_mtn": session["msisdn_mtn"],
+        "msisdn_orange": session_data["msisdn_orange"],
+        "msisdn_mtn": session_data["msisdn_mtn"],
+        "primary": session_data["primary"],
         "expires_at": (datetime.now() + timedelta(minutes=10)).isoformat()
     }
     
+    log_event("system", "OTP_VERIFY", target=session_data["primary"], result="SUCCESS", details=f"Token: {access_token}")
+    logger.info(f"✅ OTP Validé pour {session_data['primary']} | Token: {access_token}")
     return {"token": access_token}
 
-@router.post("/auth/validate-token")
-async def validate_token(token: str = Body(..., embed=True)):
+@router.get("/auth/validate-token")
+async def validate_token_get(token: str = Query(...)):
     session = ACTIVE_SESSIONS.get(token)
     if not session:
         raise HTTPException(status_code=401, detail="Token invalide")
@@ -108,6 +115,43 @@ async def validate_token(token: str = Body(..., embed=True)):
             raise HTTPException(status_code=401, detail="Token expiré")
             
     return session
+
+@router.post("/auth/validate-token")
+async def validate_token_post(token: str = Body(..., embed=True)):
+    return await validate_token_get(token)
+
+@router.get("/admin/audit-logs")
+async def get_audit_logs_endpoint(limit: int = 100):
+    from modules.common.database import get_audit_logs
+    return get_audit_logs(limit)
+
+@router.get("/admin/users")
+async def get_all_users_endpoint():
+    from modules.common.database import get_all_users
+    return get_all_users()
+
+class CreateUserRequest(BaseModel):
+    username: str
+    password: str
+    role: str
+    fullname: str
+
+@router.post("/admin/create-user")
+async def create_user_endpoint(req: CreateUserRequest):
+    from modules.common.database import create_user
+    res = create_user(req.username, req.password, req.role, req.fullname)
+    if "error" in res:
+        raise HTTPException(status_code=400, detail=res["error"])
+    return res
+
+@router.post("/admin/toggle-user")
+async def toggle_user_endpoint(username: str = Body(..., embed=True)):
+    from modules.common.database import toggle_user_status
+    return toggle_user_status(username)
+
+@router.get("/admin/alerts")
+async def get_alerts_endpoint():
+    return SECURITY_ALERTS
 
 # --- Endpoints Administratifs ---
 

@@ -61,6 +61,14 @@ async def get_mtn_balance(msisdn: str):
     logger.info(f"📱 MTN → Solde retourné pour {msisdn}")
     return account
 
+@router.get("/provider/orange/health")
+async def orange_health():
+    return {"status": "online", "operator": "Orange Guinée"}
+
+@router.get("/provider/mtn/health")
+async def mtn_health():
+    return {"status": "online", "operator": "MTN MoMo Guinée"}
+
 @router.get("/health")
 async def health():
     return {

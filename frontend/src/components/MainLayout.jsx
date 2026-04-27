@@ -28,9 +28,13 @@ export default function MainLayout({ children }) {
 
   return (
     <div style={styles.shell}>
+      {/* Lueurs de fond (Glows) */}
+      <div style={styles.glowBlue} />
+      <div style={styles.glowIndigo} />
+      
       <aside style={styles.sidebar}>
         <div style={styles.logo}>
-          <img src="/kandjou.png" alt="Logo" style={styles.logoImg} />
+          <span style={{ fontSize: "1.5rem", color: "#3b82f6" }}>◈</span>
           <div>
             <div style={styles.logoName}>KANDJOU</div>
             <div style={styles.logoSub}>Intelligence de Crédit</div>
@@ -78,25 +82,27 @@ export default function MainLayout({ children }) {
 }
 
 const styles = {
-  shell: { display: "flex", minHeight: "100vh", background: "#0a1628", fontFamily: "Inter, sans-serif" },
-  sidebar: { width: "220px", minWidth: "220px", background: "rgba(255,255,255,0.025)", borderRight: "1px solid rgba(255,255,255,0.06)", display: "flex", flexDirection: "column", padding: "1.4rem 1rem" },
-  logo: { display: "flex", alignItems: "center", gap: "0.7rem", marginBottom: "1.4rem", paddingBottom: "1.2rem", borderBottom: "1px solid rgba(255,255,255,0.06)" },
+  shell: { display: "flex", minHeight: "100vh", background: "#0B1120", fontFamily: "Inter, sans-serif", position: "relative", overflow: "hidden" },
+  glowBlue: { position: "absolute", width: "400px", height: "400px", background: "radial-gradient(circle, rgba(59,130,246,0.15) 0%, transparent 70%)", top: "20%", left: "30%", zIndex: 0, pointerEvents: "none" },
+  glowIndigo: { position: "absolute", width: "500px", height: "500px", background: "radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 70%)", top: "-10%", right: "5%", zIndex: 0, pointerEvents: "none" },
+  sidebar: { width: "220px", minWidth: "220px", background: "rgba(11, 17, 32, 0.8)", backdropFilter: "blur(20px)", borderRight: "1px solid #1E293B", display: "flex", flexDirection: "column", padding: "1.4rem 1rem", zIndex: 1 },
+  logo: { display: "flex", alignItems: "center", gap: "0.7rem", marginBottom: "1.4rem", paddingBottom: "1.2rem", borderBottom: "1px solid #1E293B" },
   logoImg: { width: "40px", height: "40px", objectFit: "contain", filter: "drop-shadow(0 0 8px rgba(59,130,246,0.3))" },
   logoName: { color: "#f1f5f9", fontWeight: "800", fontSize: "0.9rem", letterSpacing: "2px" },
-  logoSub: { color: "#334155", fontSize: "0.6rem" },
+  logoSub: { color: "#64748b", fontSize: "0.6rem" },
   opsSection: { marginBottom: "1.2rem" },
-  opsLabel: { color: "#334155", fontSize: "0.58rem", fontWeight: "800", letterSpacing: "1.5px", marginBottom: "0.4rem" },
+  opsLabel: { color: "#64748b", fontSize: "0.58rem", fontWeight: "800", letterSpacing: "1.5px", marginBottom: "0.4rem" },
   opsRow: { display: "flex", gap: "0.5rem" },
   opBadge: { width: "28px", height: "18px", objectFit: "contain", borderRadius: "3px" },
   nav: { display: "flex", flexDirection: "column", gap: "0.25rem" },
-  navItem: { display: "flex", alignItems: "center", gap: "0.7rem", background: "none", border: "none", borderRadius: "8px", padding: "0.65rem 0.8rem", color: "#475569", fontSize: "0.85rem", cursor: "pointer", textAlign: "left", width: "100%" },
+  navItem: { display: "flex", alignItems: "center", gap: "0.7rem", background: "none", border: "none", borderRadius: "8px", padding: "0.65rem 0.8rem", color: "#64748b", fontSize: "0.85rem", cursor: "pointer", textAlign: "left", width: "100%" },
   navActive: { background: "rgba(59,130,246,0.1)", color: "#3b82f6", borderLeft: "2px solid #3b82f6" },
   navIcon: { fontSize: "1rem", width: "20px", textAlign: "center" },
-  profile: { display: "flex", alignItems: "center", gap: "0.6rem", padding: "0.8rem 0", borderTop: "1px solid rgba(255,255,255,0.06)" },
+  profile: { display: "flex", alignItems: "center", gap: "0.6rem", padding: "0.8rem 0", borderTop: "1px solid #1E293B" },
   avatar: { width: "32px", height: "32px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: "bold" },
   profileInfo: { overflow: "hidden" },
   profileRole: { color: "#64748b", fontSize: "0.65rem", fontWeight: "bold" },
-  profileEmail: { color: "#334155", fontSize: "0.6rem", overflow: "hidden", textOverflow: "ellipsis" },
+  profileEmail: { color: "#475569", fontSize: "0.6rem", overflow: "hidden", textOverflow: "ellipsis" },
   btnLogout: { background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.15)", borderRadius: "8px", color: "#f87171", fontSize: "0.8rem", fontWeight: "600", padding: "0.6rem", cursor: "pointer", marginTop: "0.5rem" },
-  main: { flex: 1, overflow: "auto" }
+  main: { flex: 1, overflow: "auto", position: "relative", zIndex: 1 }
 };
