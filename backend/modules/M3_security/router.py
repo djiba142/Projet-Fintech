@@ -38,6 +38,28 @@ class OTPVerify(BaseModel):
 otp_manager = OTPStorage()
 ACTIVE_SESSIONS: Dict[str, Dict] = {} # Token -> UserData
 
+# --- Persistance Simple des Sessions (pour le dév) ---
+import json
+import os
+SESSIONS_FILE = "sessions.json"
+
+def load_sessions():
+    global ACTIVE_SESSIONS
+    if os.path.exists(SESSIONS_FILE):
+        try:
+            with open(SESSIONS_FILE, "r") as f:
+                ACTIVE_SESSIONS = json.load(f)
+                logger.info(f"💾 {len(ACTIVE_SESSIONS)} sessions chargées depuis sessions.json")
+        except: pass
+
+def save_sessions():
+    try:
+        with open(SESSIONS_FILE, "w") as f:
+            json.dump(ACTIVE_SESSIONS, f)
+    except: pass
+
+load_sessions()
+
 # --- Endpoints d'Authentification ---
 
 @router.post("/auth/login")
@@ -57,13 +79,51 @@ async def login(req: LoginRequest):
         "username": req.username,
         "role": user["role"],
         "fullname": user["fullname"],
+        "primary": req.username,
+        "msisdn_orange": user.get("msisdn_orange"),
+        "msisdn_mtn": user.get("msisdn_mtn"),
         "created_at": datetime.now().isoformat()
     }
     ACTIVE_SESSIONS[token] = session_data
+    save_sessions()
     
     log_event(req.username, "LOGIN_SUCCESS", result="SUCCESS", details=f"Rôle: {user['role']}")
     logger.info(f"✅ Connexion réussie : {req.username} (Rôle: {user['role']})")
-    return {"token": token, "role": user["role"], "fullname": user["fullname"]}
+    return {"token": token, "role": user["role"], "fullname": user["fullname"], "language": user.get("language", "FR")}
+
+class RegisterRequest(BaseModel):
+    username: str
+    password: str
+    fullname: str
+    email: Optional[str] = None
+    language: Optional[str] = "FR"
+
+@router.post("/auth/register")
+async def register(req: RegisterRequest):
+    from modules.common.database import create_user
+    res = create_user(req.username, req.password, "Client", req.fullname, req.email, req.language)
+    if "error" in res:
+        raise HTTPException(status_code=400, detail=res["error"])
+    logger.info(f"Nouvel utilisateur cree : {req.username}")
+    return {"message": "Utilisateur créé avec succès", "username": req.username}
+
+class ResetPasswordRequest(BaseModel):
+    username: str
+
+@router.post("/auth/reset-password")
+async def reset_password(req: ResetPasswordRequest):
+    """Simule l'envoi d'un e-mail de réinitialisation de mot de passe."""
+    user = get_user_by_username(req.username)
+    # On ne révèle jamais si le compte existe ou non (sécurité)
+    log_event(
+        user_id=req.username,
+        action="PASSWORD_RESET_REQUEST",
+        result="SENT" if user else "NOT_FOUND",
+        details=f"Demande de reinitialisation pour {req.username}"
+    )
+    if user:
+        logger.info(f"Demande de reinitialisation pour {req.username} - e-mail simule envoye")
+    return {"message": "Si un compte existe avec cet identifiant, un e-mail de réinitialisation a été envoyé."}
 
 @router.post("/auth/request-otp")
 async def request_otp(req: OTPRequest):
@@ -96,6 +156,7 @@ async def verify_otp(req: OTPVerify):
         "primary": session_data["primary"],
         "expires_at": (datetime.now() + timedelta(minutes=10)).isoformat()
     }
+    save_sessions()
     
     log_event("system", "OTP_VERIFY", target=session_data["primary"], result="SUCCESS", details=f"Token: {access_token}")
     logger.info(f"✅ OTP Validé pour {session_data['primary']} | Token: {access_token}")
@@ -153,18 +214,33 @@ async def toggle_user_endpoint(username: str = Body(..., embed=True)):
 async def get_alerts_endpoint():
     return SECURITY_ALERTS
 
+class UpdateLangRequest(BaseModel):
+    username: str
+    language: str
+
+@router.post("/auth/update-language")
+async def update_language(req: UpdateLangRequest):
+    from modules.common.database import get_db_connection
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE users SET language = %s WHERE username = %s", (req.language, req.username))
+    conn.commit()
+    conn.close()
+    return {"message": "Langue mise à jour", "language": req.language}
+
 # --- Endpoints Administratifs ---
 
 @router.get("/admin/system-overview")
 async def get_system_overview():
     """Retourne l'état complet du système pour le Dashboard Admin."""
+    from modules.common.database import get_all_users
     return {
         "system_status": {
             "m1_aggregator": "online",
             "m2_simulators": "online",
             "m3_security": "online"
         },
-        "users": USERS_DB,
+        "users": get_all_users(),
         "security_alerts": SECURITY_ALERTS,
         "stats": {
             "total_scorings_today": 124,
@@ -173,10 +249,3 @@ async def get_system_overview():
         }
     }
 
-@router.post("/admin/users/{user_id}/toggle-status")
-async def toggle_user_status(user_id: int):
-    for user in USERS_DB:
-        if user["id"] == user_id:
-            user["status"] = "suspended" if user["status"] == "active" else "active"
-            return {"message": f"Statut mis à jour pour {user['fullname']}", "new_status": user["status"]}
-    raise HTTPException(status_code=404, detail="Utilisateur introuvable")

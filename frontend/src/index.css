@@ -1,20 +1,143 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,400&display=swap');
 
-@theme {
-  --color-navy: #0F172A;
-  --color-cobalt: #2563EB;
-  --color-emerald: #10B981;
-  --color-coral: #F43F5E;
-  --font-inter: "Inter", sans-serif;
+:root {
+  --bg-light: #F8FAF9;
+  --text-dark: #1A1A1A;
+  --kandjou-green: #0f7b3f;
+  --sidebar-width: 260px;
 }
 
-@layer base {
-  body {
-    @apply font-inter bg-[#050d1a] text-slate-100 antialiased;
-    overflow-x: hidden;
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-light);
+  color: var(--text-dark);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Sidebar Styles (Base) */
+.sidebar {
+  width: var(--sidebar-width);
+  height: 100vh;
+  position: fixed;
+  left: 0;
+  top: 0;
+  color: white;
+  padding: 2rem 1rem;
+  z-index: 100;
+}
+
+.sidebar-client {
+  background-color: #004d28;
+}
+
+.sidebar-institution {
+  background-color: #1a2b4b;
+}
+
+.sidebar-regulator {
+  background-color: #4c1d95;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.8rem 1rem;
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.7);
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.2s;
+  margin-bottom: 0.5rem;
+}
+
+.nav-item:hover,
+.nav-item.active {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+/* Card Styles */
+.kandjou-card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  padding: 1.5rem;
+}
+
+.balance-card-orange {
+  background: #f37021;
+  color: white;
+}
+
+.balance-card-mtn {
+  background: #ffcc00;
+  color: #1a2b4b;
+}
+
+/* Button Styles */
+.btn-primary-kandjou {
+  background-color: #006233;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 0.8rem 1.5rem;
+  font-weight: 700;
+  cursor: pointer;
+  width: 100%;
+}
+
+/* Animations for Landing Page */
+@keyframes float {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-15px);
   }
 }
 
-.glass-card {
-  @apply bg-white/80 backdrop-blur-md border border-white/30 shadow-sm;
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.animate-float-delayed {
+  animation: float 6s ease-in-out infinite 3s;
+}
+
+/* Dashboard Responsive */
+@media (max-width: 768px) {
+  .dashboard-cards-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .dashboard-actions-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* Notification pulse */
+@keyframes pulse-dot {
+
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.5;
+    transform: scale(1.5);
+  }
 }

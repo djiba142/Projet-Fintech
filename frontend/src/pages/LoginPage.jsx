@@ -1,219 +1,332 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, User, Lock, Phone } from "lucide-react";
-
-const COMPTES_TEST = [
-  { role: "Agent de Crédit", username: "agent@kandjou.gn", password: "agent123", target: "/agent" },
-  { role: "Administrateur",  username: "admin@kandjou.gn",  password: "admin123", target: "/admin" },
-  { role: "Analyste Risque", username: "risk@kandjou.gn",   password: "risk123",  target: "/risk"  },
-];
-
 import axios from "axios";
 
-const API_M3 = "http://localhost:8000/m3";
+const API = "http://localhost:8000/m3";
+
+const ROLE_ROUTES = {
+  "Client": "/dashboard",
+  "Agent de Crédit": "/agent",
+  "Administrateur": "/admin",
+  "Analyste Risque": "/risk",
+  "Régulateur (BCRG)": "/audit",
+};
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const [form, setForm]       = useState({ username: "", password: "" });
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState("");
 
+  const [form, setForm] = useState({ username: "", password: "" });
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [showPwd, setShowPwd] = useState(false);
+  const [remember, setRemember] = useState(false);
+
+  // ─── Mot de passe oublié ───
+  const [showReset, setShowReset] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetDone, setResetDone] = useState(false);
+  const [resetError, setResetError] = useState("");
+
+  useEffect(() => {
+    const saved = localStorage.getItem("kandjou_remember");
+    if (saved) {
+      setForm(prev => ({ ...prev, username: saved }));
+      setRemember(true);
+    }
+  }, []);
+
+  // ─── Login ───
   const handleLogin = async (e) => {
     e.preventDefault();
-    setLoading(true);
     setError("");
-
+    if (!form.username.trim() || !form.password.trim()) {
+      setError("Tous les champs sont obligatoires.");
+      return;
+    }
+    setLoading(true);
     try {
-      const res = await axios.post(`${API_M3}/auth/login`, {
-        username: form.username,
-        password: form.password
+      const res = await axios.post(`${API}/auth/login`, {
+        username: form.username.trim(),
+        password: form.password,
       });
-      
-      const { token, role, fullname } = res.data;
-      
-      // Stockage conforme à App.jsx
-      localStorage.setItem("gn_user", JSON.stringify({ 
-        username: form.username, 
-        role: role,
-        fullname: fullname,
-        token: token 
-      }));
-
-      const map = { 
-        "Agent de Crédit": "/agent", 
-        "Administrateur": "/admin", 
-        "Analyste Risque": "/risk" 
-      };
-      
-      navigate(map[role] || "/");
+      const { token, role, fullname, language } = res.data;
+      localStorage.setItem("kandjou_token", token);
+      localStorage.setItem("kandjou_user", JSON.stringify({ username: form.username.trim(), role, fullname, language }));
+      if (remember) localStorage.setItem("kandjou_remember", form.username.trim());
+      else localStorage.removeItem("kandjou_remember");
+      navigate(ROLE_ROUTES[role] || "/dashboard");
     } catch (err) {
-      console.error("Login error:", err);
-      setError(err.response?.data?.detail || "Erreur de connexion au serveur.");
+      if (err.response?.status === 401) setError("Identifiants incorrects. Vérifiez votre numéro et mot de passe.");
+      else if (err.response?.status === 403) setError("Votre compte est suspendu. Contactez l'administrateur.");
+      else setError("Erreur de connexion au serveur. Réessayez.");
     } finally {
       setLoading(false);
     }
   };
 
+  // ─── Réinitialisation mot de passe ───
+  const handleReset = async (e) => {
+    e.preventDefault();
+    setResetError("");
+    if (!resetEmail.trim()) {
+      setResetError("Veuillez saisir votre identifiant ou e-mail.");
+      return;
+    }
+    setResetLoading(true);
+    try {
+      await axios.post(`${API}/auth/reset-password`, { username: resetEmail.trim() });
+      setResetDone(true);
+    } catch {
+      // On affiche toujours un succès pour ne pas révéler si le compte existe
+      setResetDone(true);
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
+  // ─── ÉCRAN RÉINITIALISATION ───
+  if (showReset) {
+    return (
+      <div style={S.page}>
+        <style>{CSS}</style>
+        <div style={S.bgDeco1} />
+        <div style={S.bgDeco2} />
+        <div className="login-card" style={S.card}>
+          <div style={S.greenHeader}>
+            <img src="/logo_kandjou.png" alt="Kandjou" style={S.logoImg} onClick={() => navigate("/")} />
+          </div>
+          <div style={S.body}>
+            {!resetDone ? (
+              <>
+                {/* Bouton retour */}
+                <button onClick={() => { setShowReset(false); setResetDone(false); setResetError(""); setResetEmail(""); }} style={S.backBtn}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+                  Retour à la connexion
+                </button>
+
+                <div style={{ marginBottom: "1.8rem", marginTop: "0.5rem" }}>
+                  <h1 style={S.title}>Mot de passe oublié ?</h1>
+                  <p style={S.subtitle}>Saisissez votre identifiant ou adresse e-mail. Nous vous enverrons un lien de réinitialisation.</p>
+                </div>
+
+                <form onSubmit={handleReset} style={S.form}>
+                  <div style={S.fieldGroup}>
+                    <label style={S.label}>Identifiant ou e-mail</label>
+                    <div style={S.inputWrap}>
+                      <div style={S.inputIcon}>
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                        </svg>
+                      </div>
+                      <input
+                        className="login-input"
+                        type="text"
+                        placeholder="client@kandjou.gn ou +224..."
+                        style={S.input}
+                        value={resetEmail}
+                        onChange={e => setResetEmail(e.target.value)}
+                        autoFocus
+                      />
+                    </div>
+                  </div>
+
+                  {resetError && (
+                    <div style={S.errorBox}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                      <span>{resetError}</span>
+                    </div>
+                  )}
+
+                  <button type="submit" disabled={resetLoading} className="login-btn" style={{ ...S.btnLogin, opacity: resetLoading ? 0.6 : 1, cursor: resetLoading ? "wait" : "pointer" }}>
+                    {resetLoading ? (
+                      <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}>
+                        <span style={S.spinnerStyle} />
+                        Envoi en cours...
+                      </span>
+                    ) : "Envoyer le lien de réinitialisation"}
+                  </button>
+                </form>
+              </>
+            ) : (
+              /* ─── MESSAGE DE CONFIRMATION ─── */
+              <div style={{ textAlign: "center", padding: "1rem 0" }}>
+                <div style={{ width: 70, height: 70, background: "#E8F5EE", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 1.5rem" }}>
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#006233" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+                  </svg>
+                </div>
+                <h2 style={{ fontSize: "1.35rem", fontWeight: 900, color: "#1E293B", marginBottom: "0.8rem" }}>E-mail envoyé !</h2>
+                <p style={{ fontSize: "0.88rem", color: "#64748B", fontWeight: 500, lineHeight: 1.6, marginBottom: "2rem" }}>
+                  Si un compte est associé à <strong style={{ color: "#1E293B" }}>{resetEmail}</strong>, vous recevrez un lien de réinitialisation dans quelques instants.
+                </p>
+                <p style={{ fontSize: "0.78rem", color: "#94A3B8", fontWeight: 600, marginBottom: "2rem" }}>
+                  Pensez à vérifier votre dossier spam.
+                </p>
+                <button onClick={() => { setShowReset(false); setResetDone(false); setResetEmail(""); }} className="login-btn" style={{ ...S.btnLogin, cursor: "pointer" }}>
+                  Retour à la connexion
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── ÉCRAN PRINCIPAL (LOGIN) ───
   return (
-    <div style={styles.container}>
-      {/* Lueurs de fond (Glows) */}
-      <div style={styles.glowBlue} />
-      <div style={styles.glowIndigo} />
+    <div style={S.page}>
+      <style>{CSS}</style>
+      <div style={S.bgDeco1} />
+      <div style={S.bgDeco2} />
 
-      {/* Bouton Retour */}
-      <button onClick={() => navigate('/')} style={styles.backBtn}>
-        <ArrowLeft size={16} /> RETOUR À L'ACCUEIL
-      </button>
-
-      <div style={styles.card}>
-        <div style={styles.header}>
-          <div style={{ fontSize: "3rem", color: "#3b82f6", marginBottom: "0.5rem" }}>◈</div>
-          <h1 style={styles.title}>KANDJOU</h1>
-          <p style={styles.subtitle}>Intelligence de Crédit</p>
+      <div className="login-card" style={S.card}>
+        {/* ── Bandeau vert + logo ── */}
+        <div style={S.greenHeader}>
+          <img src="/logo_kandjou.png" alt="Kandjou" style={S.logoImg} onClick={() => navigate("/")} />
         </div>
 
-        <form onSubmit={handleLogin} style={styles.form}>
-          {error && <div style={styles.error}>{error}</div>}
-          
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Utilisateur</label>
-            <div style={styles.inputWrap}>
-              <User size={16} style={styles.icon} />
-              <input 
-                type="text" 
-                placeholder="email@kandjou.gn"
-                value={form.username} 
-                onChange={e => setForm({...form, username: e.target.value})} 
-                style={styles.input} 
-              />
-            </div>
+        <div style={S.body}>
+          <div style={{ marginBottom: "2rem" }}>
+            <h1 style={S.title}>Bienvenue sur Kandjou</h1>
+            <p style={S.subtitle}>Connectez-vous à votre espace sécurisé pour accéder à vos comptes Mobile Money en Guinée.</p>
           </div>
 
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Mot de passe</label>
-            <div style={styles.inputWrap}>
-              <Lock size={16} style={styles.icon} />
-              <input 
-                type="password" 
-                placeholder="••••••••"
-                value={form.password} 
-                onChange={e => setForm({...form, password: e.target.value})} 
-                style={styles.input} 
-              />
+          <form onSubmit={handleLogin} style={S.form}>
+            {/* Numéro de téléphone */}
+            <div style={S.fieldGroup}>
+              <label style={S.label}>Numéro de téléphone</label>
+              <div style={S.inputWrap}>
+                <div style={S.inputIcon}>
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
+                  </svg>
+                </div>
+                <input className="login-input" type="text" placeholder="+224 6XX XX XX XX" autoComplete="username" style={S.input} value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} />
+              </div>
             </div>
+
+            {/* Mot de passe */}
+            <div style={S.fieldGroup}>
+              <label style={S.label}>Mot de passe</label>
+              <div style={S.inputWrap}>
+                <div style={S.inputIcon}>
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                  </svg>
+                </div>
+                <input className="login-input" type={showPwd ? "text" : "password"} placeholder="••••••••••" autoComplete="current-password" style={S.input} value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} />
+                <button type="button" className="pwd-eye" onClick={() => setShowPwd(!showPwd)} style={S.pwdToggle} tabIndex={-1}>
+                  {showPwd ? (
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                  ) : (
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Options */}
+            <div style={S.optionsRow}>
+              <label style={S.checkLabel}>
+                <input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} style={{ accentColor: "#006233", width: 15, height: 15, cursor: "pointer" }} />
+                <span style={{ fontSize: "0.8rem", fontWeight: 600, color: "#64748B" }}>Se souvenir de moi</span>
+              </label>
+              <span style={S.forgotLink} onClick={() => setShowReset(true)}>
+                Mot de passe oublié ?
+              </span>
+            </div>
+
+            {/* Erreur */}
+            {error && (
+              <div style={S.errorBox}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                <span>{error}</span>
+              </div>
+            )}
+
+            {/* Bouton */}
+            <button type="submit" disabled={loading} className="login-btn" style={{ ...S.btnLogin, opacity: loading ? 0.6 : 1, cursor: loading ? "wait" : "pointer" }}>
+              {loading ? (
+                <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}>
+                  <span style={S.spinnerStyle} />
+                  Connexion en cours...
+                </span>
+              ) : "Se connecter"}
+            </button>
+          </form>
+
+          {/* Séparateur */}
+          <div style={S.sep}>
+            <div style={{ flex: 1, height: 1, background: "#E2E8F0" }} />
+            <span style={{ fontSize: "0.72rem", fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: 1 }}>ou</span>
+            <div style={{ flex: 1, height: 1, background: "#E2E8F0" }} />
           </div>
 
-          <button type="submit" style={styles.loginBtn} disabled={loading}>
-            {loading ? "CONNEXION..." : "SE CONNECTER"}
-          </button>
-        </form>
+          <p style={S.registerRow}>
+            Nouveau sur Kandjou ?{" "}
+            <span style={S.registerLink} onClick={() => navigate("/register")}>Créer un compte</span>
+          </p>
 
-        <div style={styles.demoSection}>
-          <p style={styles.demoTitle}>Accès Rapides (Démo)</p>
-          <div style={styles.demoGrid}>
-            {COMPTES_TEST.map((c, i) => (
-              <button key={i} onClick={() => { setForm({username: c.username, password: c.password}); setError(""); }} style={styles.demoBtn}>
-                {c.role}
-              </button>
-            ))}
+          <div style={S.secFooter}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            <span>Connexion sécurisée SSL 256-bit</span>
           </div>
         </div>
-
-        <p style={styles.footer}>Système Sécurisé • Kandjou 2026</p>
       </div>
     </div>
   );
 }
 
-const styles = {
-  container: {
-    minHeight: "100vh",
-    background: "#0B1120",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "2rem",
-    position: "relative",
-    fontFamily: "Inter, sans-serif",
-    color: "#fff",
-    overflow: "hidden"
-  },
-  glowBlue: { position: "absolute", width: "400px", height: "400px", background: "radial-gradient(circle, rgba(59,130,246,0.15) 0%, transparent 70%)", top: "20%", left: "-10%", zIndex: 0, pointerEvents: "none" },
-  glowIndigo: { position: "absolute", width: "500px", height: "500px", background: "radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 70%)", bottom: "-10%", right: "-10%", zIndex: 0, pointerEvents: "none" },
-  backBtn: {
-    position: "absolute",
-    top: "2rem",
-    left: "2rem",
-    background: "rgba(255,255,255,0.03)",
-    border: "1px solid #1E293B",
-    borderRadius: "8px",
-    padding: "0.6rem 1.2rem",
-    color: "#94a3b8",
-    fontSize: "0.7rem",
-    fontWeight: "900",
-    letterSpacing: "1px",
-    cursor: "pointer",
-    display: "flex",
-    alignItems: "center",
-    gap: "0.8rem",
-    transition: "all 0.2s",
-    zIndex: 10
-  },
-  card: {
-    width: "100%",
-    maxWidth: "400px",
-    background: "rgba(21, 28, 44, 0.6)",
-    backdropFilter: "blur(20px)",
-    border: "1px solid #1E293B",
-    borderRadius: "24px",
-    padding: "3rem",
-    textAlign: "center",
-    zIndex: 1,
-    boxShadow: "0 20px 40px rgba(0,0,0,0.3)"
-  },
-  header: { marginBottom: "2.5rem" },
-  logo: { width: "64px", height: "64px", marginBottom: "1rem" },
-  title: { fontSize: "1.8rem", fontWeight: "900", letterSpacing: "2px" },
-  subtitle: { fontSize: "0.8rem", color: "#64748b", marginTop: "0.5rem" },
-  form: { display: "flex", flexDirection: "column", gap: "1.5rem" },
-  inputGroup: { textAlign: "left" },
-  label: { fontSize: "0.7rem", fontWeight: "900", color: "#64748b", textTransform: "uppercase", marginBottom: "0.5rem", display: "block" },
+// ══════════ CSS global ══════════
+const CSS = `
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  .login-card { animation: cardIn 0.6s cubic-bezier(0.16,1,0.3,1) forwards; }
+  @keyframes cardIn { from { opacity:0; transform:translateY(24px) scale(0.97); } to { opacity:1; transform:translateY(0) scale(1); } }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .login-input:focus { border-color:#006233!important; background:#fff!important; box-shadow:0 0 0 4px rgba(0,98,51,0.08)!important; }
+  .login-btn:hover:not(:disabled) { transform:translateY(-2px); box-shadow:0 16px 36px rgba(0,98,51,0.35)!important; }
+  .login-btn:active:not(:disabled) { transform:translateY(0) scale(0.98); }
+  .pwd-eye:hover { color:#006233!important; }
+`;
+
+// ══════════ STYLES ══════════
+const S = {
+  page: { minHeight: "100vh", fontFamily: "'Plus Jakarta Sans',sans-serif", background: "#F1F5F9", display: "flex", alignItems: "center", justifyContent: "center", padding: "2rem", position: "relative", overflow: "hidden" },
+  bgDeco1: { position: "absolute", top: "-12%", right: "-8%", width: "45%", height: "55%", borderRadius: "50%", background: "radial-gradient(circle, rgba(0,98,51,0.04) 0%, transparent 70%)", zIndex: 0 },
+  bgDeco2: { position: "absolute", bottom: "-15%", left: "-10%", width: "50%", height: "55%", borderRadius: "50%", background: "radial-gradient(circle, rgba(0,98,51,0.04) 0%, transparent 70%)", zIndex: 0 },
+
+  card: { width: "100%", maxWidth: 440, background: "#fff", borderRadius: 28, overflow: "hidden", boxShadow: "0 25px 60px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.03)", position: "relative", zIndex: 1 },
+  greenHeader: { background: "linear-gradient(135deg, #003D20 0%, #006233 60%, #008C46 100%)", padding: "1.8rem 2.5rem", display: "flex", alignItems: "center", justifyContent: "center" },
+  logoImg: { height: 48, objectFit: "contain", cursor: "pointer" },
+  body: { padding: "2.2rem 2.5rem 2rem" },
+
+  title: { fontSize: "1.5rem", fontWeight: 900, color: "#1E293B", letterSpacing: "-0.8px", marginBottom: "0.5rem" },
+  subtitle: { fontSize: "0.85rem", color: "#64748B", fontWeight: 500, lineHeight: 1.55 },
+
+  form: { display: "flex", flexDirection: "column", gap: "1.3rem" },
+  fieldGroup: { display: "flex", flexDirection: "column", gap: "7px" },
+  label: { fontSize: "0.7rem", fontWeight: 800, color: "#475569", textTransform: "uppercase", letterSpacing: 1.1 },
   inputWrap: { position: "relative", display: "flex", alignItems: "center" },
-  icon: { position: "absolute", left: "1rem", color: "#475569" },
-  input: {
-    width: "100%",
-    background: "#0B1120",
-    border: "1px solid #1E293B",
-    borderRadius: "12px",
-    padding: "0.8rem 1rem 0.8rem 2.8rem",
-    color: "#fff",
-    fontSize: "0.9rem",
-    outline: "none"
-  },
-  loginBtn: {
-    background: "#2563eb",
-    color: "#fff",
-    border: "none",
-    borderRadius: "10px",
-    padding: "1rem",
-    fontWeight: "900",
-    cursor: "pointer",
-    marginTop: "0.5rem",
-    letterSpacing: "1px"
-  },
-  error: { color: "#ef4444", fontSize: "0.8rem", fontWeight: "bold", marginBottom: "1rem" },
-  demoSection: { marginTop: "2.5rem", paddingTop: "2rem", borderTop: "1px solid #1E293B" },
-  demoTitle: { fontSize: "0.7rem", fontWeight: "900", color: "#475569", textTransform: "uppercase", marginBottom: "1rem" },
-  demoGrid: { display: "grid", gridTemplateColumns: "1fr", gap: "0.5rem" },
-  demoBtn: {
-    background: "rgba(255,255,255,0.02)",
-    border: "1px solid #1E293B",
-    borderRadius: "8px",
-    padding: "0.6rem",
-    color: "#94a3b8",
-    fontSize: "0.75rem",
-    fontWeight: "700",
-    cursor: "pointer"
-  },
-  footer: { marginTop: "2rem", fontSize: "0.6rem", color: "#334155", fontWeight: "bold", textTransform: "uppercase" }
+  inputIcon: { position: "absolute", left: "15px", display: "flex", alignItems: "center", pointerEvents: "none", zIndex: 1 },
+  input: { width: "100%", background: "#F8FAFC", border: "2px solid #E2E8F0", borderRadius: 14, padding: "0.95rem 0.95rem 0.95rem 46px", fontSize: "0.92rem", fontWeight: 600, color: "#1E293B", outline: "none", transition: "all 0.25s ease" },
+  pwdToggle: { position: "absolute", right: "12px", background: "none", border: "none", cursor: "pointer", color: "#94A3B8", display: "flex", alignItems: "center", padding: "4px", transition: "color 0.2s" },
+
+  optionsRow: { display: "flex", justifyContent: "space-between", alignItems: "center" },
+  checkLabel: { display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" },
+  forgotLink: { fontSize: "0.78rem", fontWeight: 700, color: "#006233", cursor: "pointer", transition: "opacity 0.2s" },
+
+  errorBox: { display: "flex", alignItems: "center", gap: "10px", background: "#FEF2F2", border: "1.5px solid #FECACA", borderRadius: 12, padding: "0.85rem 1.1rem", fontSize: "0.8rem", fontWeight: 700, color: "#DC2626" },
+
+  btnLogin: { width: "100%", background: "linear-gradient(135deg, #006233 0%, #008C46 100%)", color: "#fff", border: "none", borderRadius: 16, padding: "1.1rem", fontSize: "0.95rem", fontWeight: 800, boxShadow: "0 12px 28px rgba(0,98,51,0.25)", transition: "all 0.25s cubic-bezier(0.4,0,0.2,1)", marginTop: "0.3rem" },
+  spinnerStyle: { display: "inline-block", width: 17, height: 17, border: "2.5px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.8s linear infinite" },
+
+  sep: { display: "flex", alignItems: "center", gap: "14px", margin: "1.8rem 0" },
+  registerRow: { textAlign: "center", fontSize: "0.88rem", color: "#64748B", fontWeight: 600 },
+  registerLink: { color: "#006233", fontWeight: 800, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: "3px" },
+  secFooter: { display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", marginTop: "2rem", fontSize: "0.68rem", fontWeight: 600, color: "#94A3B8" },
+
+  backBtn: { display: "flex", alignItems: "center", gap: "8px", background: "none", border: "none", color: "#006233", fontSize: "0.82rem", fontWeight: 700, cursor: "pointer", padding: 0, marginBottom: "0.5rem" },
 };

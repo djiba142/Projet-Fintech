@@ -1,194 +1,118 @@
-import { useState, useEffect } from "react";
-import axios from "axios";
+import { useState } from "react";
 import MainLayout from "../components/MainLayout";
 
-const API_BASE = "http://localhost:8000/m1";
-
-function LineChart({ data }) {
-  const W = 600, H = 160, PAD = { top: 16, right: 20, bottom: 32, left: 36 };
-  const innerW = W - PAD.left - PAD.right;
-  const innerH = H - PAD.top - PAD.bottom;
-  const maxY = 100, minY = 0;
-
-  const pts = data.map((d, i) => ({
-    x: PAD.left + (i / (data.length - 1)) * innerW,
-    y: PAD.top + innerH - ((d.score - minY) / (maxY - minY)) * innerH,
-    ...d
-  }));
-
-  const pathD = pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
-  const areaD = `${pathD} L ${pts[pts.length - 1].x} ${PAD.top + innerH} L ${pts[0].x} ${PAD.top + innerH} Z`;
-
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ overflow: "visible" }}>
-      <defs>
-        <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.3" />
-          <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.02" />
-        </linearGradient>
-      </defs>
-      {[0, 20, 40, 60, 80].map(v => {
-        const y = PAD.top + innerH - (v / maxY) * innerH;
-        return (
-          <g key={v}>
-            <line x1={PAD.left} y1={y} x2={PAD.left + innerW} y2={y} stroke="rgba(255,255,255,0.05)" />
-            <text x={PAD.left - 8} y={y} textAnchor="end" dominantBaseline="central" fill="#475569" fontSize="10">{v}</text>
-          </g>
-        );
-      })}
-      <path d={areaD} fill="url(#areaGrad)" />
-      <path d={pathD} fill="none" stroke="#3b82f6" strokeWidth="2" />
-      {pts.map((p, i) => (
-        <circle key={i} cx={p.x} cy={p.y} r="3" fill="#3b82f6" />
-      ))}
-      {pts.map((p, i) => (
-        <text key={i} x={p.x} y={PAD.top + innerH + 18} textAnchor="middle" fill="#475569" fontSize="11">{p.jour}</text>
-      ))}
-    </svg>
-  );
-}
-
 export default function RiskDashboard() {
-  const [threshold, setThreshold] = useState(65);
-  const [syncing, setSyncing] = useState(false);
-
-  useEffect(() => {
-    // Charger le seuil depuis le backend
-    const fetchThreshold = async () => {
-      try {
-        const res = await axios.get(`${API_BASE}/risk/threshold`);
-        setThreshold(res.data.threshold);
-      } catch (err) {
-        console.error("Erreur lors du chargement du seuil :", err);
-      }
-    };
-    fetchThreshold();
-  }, []);
-
-  const handleThresholdChange = async (val) => {
-    setThreshold(val);
-    setSyncing(true);
-    try {
-      await axios.post(`${API_BASE}/risk/threshold`, { threshold: val });
-    } catch (err) {
-      console.error("Erreur lors de la mise à jour du seuil :", err);
-    } finally {
-      setSyncing(false);
-    }
-  };
-
-  const WEEK_DATA = [
-    { jour: "Lun", score: 45 }, { jour: "Mar", score: 52 }, { jour: "Mer", score: 48 },
-    { jour: "Jeu", score: 62 }, { jour: "Ven", score: 58 }, { jour: "Sam", score: 70 }, { jour: "Dim", score: 75 }
-  ];
-
-  const estimEligibles = Math.round(100 - threshold * 0.72 + 5);
-  const sliderColor = threshold >= 75 ? "#ef4444" : threshold >= 55 ? "#f59e0b" : "#22c55e";
+  const [config, setConfig] = useState({
+    min_balance: 500000,
+    min_activity_score: 40,
+    high_risk_threshold: 30,
+    auto_approve_threshold: 80,
+  });
 
   return (
     <MainLayout>
-      <div style={s.page}>
-        <div style={s.header}>
+      <div className="max-w-6xl mx-auto py-6 space-y-8">
+        <header>
+          <h1 className="text-2xl font-black text-gray-900 tracking-tight">Politique de risque</h1>
+          <p className="text-gray-500 text-sm font-medium">Configuration des seuils d'éligibilité et monitoring</p>
+        </header>
+
+        {/* KPIs */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[
+            { label: "Score moyen portefeuille", val: "68/100", icon: "📊" },
+            { label: "Clients à risque", val: "12", icon: "⚠️", color: "text-red-500" },
+            { label: "Auto-approuvés", val: "86%", icon: "✅", color: "text-green-600" },
+            { label: "Alertes actives", val: "2", icon: "🔴", color: "text-red-500" },
+          ].map((s, i) => (
+            <div key={i} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-sm">{s.icon}</span>
+                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{s.label}</p>
+              </div>
+              <p className={`text-2xl font-black ${s.color || "text-gray-900"}`}>{s.val}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Configuration seuils */}
+          <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+            <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6">Configuration des seuils</h3>
+            <div className="space-y-5">
+              {[
+                { label: "Solde minimum consolidé (GNF)", key: "min_balance", desc: "Seuil minimal de liquidité" },
+                { label: "Score d'activité minimal", key: "min_activity_score", desc: "Fréquence minimale sur 90j" },
+                { label: "Seuil de risque élevé", key: "high_risk_threshold", desc: "Déclenche un audit manuel" },
+                { label: "Seuil auto-approbation", key: "auto_approve_threshold", desc: "Validation sans agent" },
+              ].map((item, i) => (
+                <div key={i}>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-xs font-bold text-gray-700">{item.label}</span>
+                    <input
+                      type="number"
+                      value={config[item.key]}
+                      onChange={e => setConfig({ ...config, [item.key]: e.target.value })}
+                      className="w-28 text-right text-sm font-black bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-[#2D6A4F]"
+                    />
+                  </div>
+                  <p className="text-[10px] text-gray-400">{item.desc}</p>
+                </div>
+              ))}
+            </div>
+            <button className="mt-6 w-full py-3 bg-[#2D6A4F] text-white rounded-xl text-xs font-bold hover:bg-[#1A3A2A] transition-all">
+              Enregistrer les paramètres
+            </button>
+          </div>
+
+          {/* Alertes */}
+          <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+            <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6">Alertes actives</h3>
+            <div className="space-y-3">
+              {[
+                { type: "HIGH", msg: "Pic d'activité suspect sur 622***456", time: "14:20", color: "border-red-100 bg-red-50" },
+                { type: "MEDIUM", msg: "Solde consolidé faible : 664***012", time: "13:05", color: "border-yellow-100 bg-yellow-50" },
+              ].map((a, i) => (
+                <div key={i} className={`p-4 rounded-xl border ${a.color}`}>
+                  <div className="flex items-start gap-3">
+                    <span className={`w-2 h-2 rounded-full mt-1.5 ${a.type === "HIGH" ? "bg-red-500" : "bg-yellow-500"}`} />
+                    <div>
+                      <p className="text-xs font-bold text-gray-700">{a.msg}</p>
+                      <p className="text-[10px] text-gray-400 mt-1">{a.time} • Priorité {a.type}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Distribution graphique */}
+            <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-8 mb-4">Distribution du risque</h3>
+            <div className="h-32 flex items-end gap-1.5 px-2">
+              {[40, 25, 60, 85, 30, 45, 90, 75, 55, 65, 40, 30, 50, 70, 80].map((h, i) => (
+                <div key={i} className="flex-1 rounded-t transition-all"
+                  style={{
+                    height: `${h}%`,
+                    background: h > 70 ? "#2D6A4F" : h < 35 ? "#EF4444" : "#D97706",
+                    opacity: 0.6,
+                  }} />
+              ))}
+            </div>
+            <div className="flex justify-between mt-2">
+              <span className="text-[9px] text-gray-400 font-bold">Faible</span>
+              <span className="text-[9px] text-gray-400 font-bold">Critique</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Info algorithme */}
+        <div className="p-5 bg-blue-50 rounded-xl border border-blue-100 flex items-start gap-4">
+          <span className="text-lg">ℹ️</span>
           <div>
-            <h1 style={s.title}>Supervision des Risques</h1>
-            <p style={s.subtitle}>Politiques de crédit et seuils d'approbation</p>
-          </div>
-        </div>
-
-        <div style={s.kpiGrid}>
-          <div style={s.kpiCard}>
-            <div style={s.kpiIcon}>📊</div>
-            <div style={s.kpiValue}>1,284</div>
-            <div style={s.kpiLabel}>TOTAL SCORINGS</div>
-          </div>
-          <div style={s.kpiCard}>
-            <div style={s.kpiIcon}>✓</div>
-            <div style={s.kpiValue}>68%</div>
-            <div style={s.kpiLabel}>APPROBATION</div>
-          </div>
-          <div style={s.kpiCard}>
-            <div style={s.kpiIcon}>↗</div>
-            <div style={s.kpiValue}>4.2M GNF</div>
-            <div style={s.kpiLabel}>VOLUME CRÉDIT</div>
-          </div>
-        </div>
-
-        <div style={s.chartCard}>
-          <h2 style={s.sectionTitle}>ÉVOLUTION SOLVABILITÉ (MOYENNE HEBDOMADAIRE)</h2>
-          <div style={{ marginTop: "1.5rem" }}>
-            <LineChart data={WEEK_DATA} />
-          </div>
-        </div>
-
-        <div style={s.thresholdGrid}>
-          <div style={s.sliderCard}>
-            <div style={s.sliderHeader}>
-              <h2 style={s.sectionTitle}>GESTIONNAIRE DE SEUILS</h2>
-            </div>
-            <div style={s.sliderLabelRow}>
-              <div>
-                <p style={s.sliderName}>Seuil de Scoring Minimal {syncing && <span style={{ fontSize: "0.6rem", color: "#3b82f6", fontWeight: "normal" }}>(Synchronisation...)</span>}</p>
-                <p style={s.sliderDesc}>Détermine l'éligibilité automatique des dossiers</p>
-              </div>
-              <div style={{ ...s.sliderValue, color: sliderColor }}>{threshold}</div>
-            </div>
-            <div style={s.sliderTrackWrap}>
-              <div style={s.sliderTrackBg}>
-                <div style={{ ...s.sliderFill, width: `${threshold}%`, background: sliderColor }} />
-              </div>
-              <input type="range" min="0" max="100" value={threshold} onChange={e => handleThresholdChange(Number(e.target.value))} style={s.sliderInput} />
-            </div>
-            <div style={s.sliderTooltip}>
-              Les dossiers avec un score inférieur à <strong>{threshold}</strong> seront rejetés.
-            </div>
-          </div>
-
-          <div style={s.impactCard}>
-            <p style={s.impactLabel}>IMPACT ESTIMÉ</p>
-            <div style={{ ...s.impactValue, color: sliderColor }}>{estimEligibles}%</div>
-            <p style={s.impactSubLabel}>Taux d'éligibilité du portfolio</p>
-            <div style={s.miniGauge}>
-              <div style={{ ...s.miniGaugeFill, width: `${estimEligibles}%`, background: sliderColor }} />
-            </div>
-            <p style={{ ...s.impactWarning, color: sliderColor }}>
-              {threshold >= 75 ? "POLITIQUE STRICTE" : threshold >= 55 ? "POLITIQUE MODÉRÉE" : "POLITIQUE AGRESSIVE"}
-            </p>
+            <p className="text-xs font-bold text-gray-800 mb-1">Algorithme de scoring V4.2 actif</p>
+            <p className="text-[10px] text-gray-500">Les critères incluent le ratio d'utilisation Orange vs MTN et l'ancienneté des comptes.</p>
           </div>
         </div>
       </div>
     </MainLayout>
   );
 }
-
-const s = {
-  page: { padding: "2rem", color: "#fff", background: "transparent" },
-  header: { marginBottom: "1.5rem" },
-  title: { fontSize: "1.5rem", fontWeight: "900", margin: 0 },
-  subtitle: { color: "#64748b", fontSize: "0.85rem" },
-  kpiGrid: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1rem", marginBottom: "1.5rem" },
-  kpiCard: { background: "#151C2C", border: "1px solid #1E293B", borderRadius: "12px", padding: "1.2rem" },
-  kpiIcon: { color: "#3b82f6", fontSize: "1.2rem", marginBottom: "0.5rem" },
-  kpiValue: { fontSize: "1.8rem", fontWeight: "900" },
-  kpiLabel: { fontSize: "0.65rem", fontWeight: "bold", color: "#475569", letterSpacing: "1px" },
-  sectionTitle: { fontSize: "0.7rem", fontWeight: "bold", color: "#475569", letterSpacing: "1px" },
-  chartCard: { background: "#151C2C", border: "1px solid #1E293B", borderRadius: "16px", padding: "1.5rem", marginBottom: "1.5rem" },
-  thresholdGrid: { display: "grid", gridTemplateColumns: "1fr 300px", gap: "1.5rem" },
-  sliderCard: { background: "#151C2C", border: "1px solid #1E293B", borderRadius: "16px", padding: "1.5rem" },
-  sliderHeader: { marginBottom: "1.5rem" },
-  sliderLabelRow: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" },
-  sliderName: { fontSize: "0.9rem", fontWeight: "bold", margin: 0 },
-  sliderDesc: { fontSize: "0.75rem", color: "#64748b", margin: 0 },
-  sliderValue: { fontSize: "2.5rem", fontWeight: "900" },
-  sliderTrackWrap: { position: "relative", height: "8px", background: "#0B1120", borderRadius: "4px" },
-  sliderTrackBg: { height: "100%", borderRadius: "4px", overflow: "hidden" },
-  sliderFill: { height: "100%", transition: "width 0.1s" },
-  sliderInput: { position: "absolute", top: "-6px", left: 0, width: "100%", opacity: 0, cursor: "pointer" },
-  sliderTooltip: { marginTop: "1.5rem", padding: "1rem", background: "rgba(255,255,255,0.02)", borderRadius: "8px", fontSize: "0.8rem", color: "#94a3b8" },
-  impactCard: { background: "#151C2C", border: "1px solid #1E293B", borderRadius: "16px", padding: "1.5rem", textAlign: "center" },
-  impactLabel: { fontSize: "0.65rem", fontWeight: "bold", color: "#475569", letterSpacing: "1px", marginBottom: "1rem" },
-  impactValue: { fontSize: "3.5rem", fontWeight: "900", marginBottom: "0.5rem" },
-  impactSubLabel: { fontSize: "0.75rem", color: "#64748b", marginBottom: "1rem" },
-  miniGauge: { height: "6px", background: "#0B1120", borderRadius: "3px", overflow: "hidden", marginBottom: "1rem" },
-  miniGaugeFill: { height: "100%", transition: "width 0.3s" },
-  impactWarning: { fontSize: "0.7rem", fontWeight: "bold" }
-};

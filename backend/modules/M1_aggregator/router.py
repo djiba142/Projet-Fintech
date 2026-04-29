@@ -7,6 +7,7 @@ from typing import List, Optional, Dict
 
 from dotenv import load_dotenv
 from fastapi import APIRouter, HTTPException, Path, Request, Depends, Header, Query, status, Body
+from pydantic import BaseModel
 import httpx
 
 # Importation directe des fonctions des autres modules pour éviter les boucles HTTP
@@ -177,12 +178,24 @@ async def aggregate(
 ):
     """
     Agrégation synchrone avec dual-MSISDN.
-    Utilise les numéros Orange et MTN stockés dans le token M3.
+    Utilise les numéros Orange et MTN stockés dans le token M3 ou en base.
     Le {msisdn} dans l'URL sert de référence client (primary).
     """
+    # Si l'utilisateur demande ses propres données ou si c'est un Admin/Agent
     msisdn_orange = token_data.get("msisdn_orange")
     msisdn_mtn = token_data.get("msisdn_mtn")
-    primary = token_data.get("primary", msisdn)
+    primary = token_data.get("primary")
+    
+    # Si c'est un Admin ou un Agent demandant pour un autre client, on récupère les MSISDN en base
+    if token_data.get("role") in ["Admin", "Agent", "Regulateur"] and msisdn != primary:
+        from modules.common.database import get_user_by_username
+        target_user = get_user_by_username(msisdn)
+        if target_user:
+            msisdn_orange = target_user.get("msisdn_orange")
+            msisdn_mtn = target_user.get("msisdn_mtn")
+            primary = msisdn
+    else:
+        primary = token_data.get("primary", msisdn)
     
     logger.info(f"📣 Agrégation déclenchée | Primary: {primary} | Orange: {msisdn_orange} | MTN: {msisdn_mtn}")
     
@@ -218,12 +231,15 @@ async def aggregate(
     import hashlib
     report_id = f"KDJ-{datetime.now().strftime('%Y%m%d')}-{hashlib.md5(msisdn.encode()).hexdigest()[:4].upper()}"
     
-    # Données KYC Simulées (viendraient de M2 en production)
+    # Données KYC Dynamiques
+    from modules.common.database import get_user_by_username
+    target_user = get_user_by_username(primary) or {}
+    
     kyc_data = {
-        "fullname": "Mamadou Alimou DIALLO",
-        "id_card": "GN-ID-2024-8891-B",
-        "nationality": "Guinéenne",
-        "operator": "Orange Money" if msisdn.startswith("62") else "MTN MoMo"
+        "fullname": target_user.get("fullname", "Utilisateur Inconnu"),
+        "id_card": target_user.get("id_card", "Non fournie"),
+        "nationality": target_user.get("nationality", "Guinéenne"),
+        "operator": "Orange Money" if str(msisdn_orange).startswith("62") else "MTN MoMo"
     }
 
     result = {
@@ -252,3 +268,146 @@ async def aggregate(
     )
     
     return result
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Gestion des Transactions (M1 Aggregated)
+# ─────────────────────────────────────────────────────────────────────────────
+
+async def fetch_orange_transactions(msisdn: str) -> List[dict]:
+    """Appelle directement M2 pour l'historique Orange."""
+    from modules.M2_simulators.router import get_orange_transactions
+    try:
+        data = await get_orange_transactions(msisdn)
+        return [{"id": t["id"], "date": t["date"], "desc": t["desc"], "type": t["type"], "amount": t["amount"], "status": t["status"], "op": "ORANGE"} for t in data]
+    except Exception: return []
+
+async def fetch_mtn_transactions(msisdn: str) -> List[dict]:
+    """Appelle directement M2 pour l'historique MTN."""
+    from modules.M2_simulators.router import get_mtn_transactions
+    try:
+        data = await get_mtn_transactions(msisdn)
+        return [{"id": t["id"], "date": t["date"], "desc": t["desc"], "type": t["type"], "amount": t["amount"], "status": t["status"], "op": "MTN"} for t in data]
+    except Exception: return []
+
+@router.get("/transactions/{msisdn}")
+async def get_aggregated_transactions(
+    msisdn: str,
+    token_data: Dict = Depends(require_valid_token)
+):
+    """
+    Fusionne et normalise l'historique multi-opérateurs.
+    """
+    msisdn_orange = token_data.get("msisdn_orange")
+    msisdn_mtn = token_data.get("msisdn_mtn")
+    
+    # Sécurité : un client ne peut voir que ses propres transactions
+    if token_data.get("role") not in ["Admin", "Agent", "Regulateur"] and msisdn != token_data.get("primary"):
+         msisdn = token_data.get("primary")
+         
+    tasks = []
+    tasks.append(fetch_orange_transactions(msisdn_orange) if msisdn_orange else asyncio.sleep(0, []))
+    tasks.append(fetch_mtn_transactions(msisdn_mtn) if msisdn_mtn else asyncio.sleep(0, []))
+    
+    results = await asyncio.gather(*tasks)
+    
+    # Flatten and Sort
+    all_tx = []
+    for res in results:
+        if isinstance(res, list):
+            all_tx.extend(res)
+            
+    # Tri par date décroissante
+    all_tx.sort(key=lambda x: x["date"], reverse=True)
+    
+    return {
+        "msisdn": msisdn,
+        "count": len(all_tx),
+        "transactions": all_tx,
+        "timestamp": datetime.now().isoformat()
+    }
+
+class UnifiedTransferRequest(BaseModel):
+    operator: str
+    to_msisdn: str
+    amount: int
+    note: Optional[str] = "Transfert Kandjou"
+
+@router.post("/transfer")
+async def process_transfer(
+    req: UnifiedTransferRequest,
+    token_data: Dict = Depends(require_valid_token)
+):
+    """
+    Route unifiée pour effectuer un transfert via le simulateur approprié.
+    """
+    from modules.M2_simulators.router import execute_simulated_transfer, TransferRequest as SimReq
+    
+    msisdn_orange = token_data.get("msisdn_orange")
+    msisdn_mtn = token_data.get("msisdn_mtn")
+    
+    # Détermination du MSISDN source basé sur l'opérateur choisi
+    from_msisdn = msisdn_orange if req.operator.upper() == "ORANGE" else msisdn_mtn
+    
+    if not from_msisdn:
+        raise HTTPException(status_code=400, detail=f"Aucun compte {req.operator} lié à votre profil.")
+
+    # Appel direct de la fonction du simulateur (simulation interne)
+    sim_req = SimReq(
+        operator=req.operator,
+        from_msisdn=from_msisdn,
+        to_msisdn=req.to_msisdn,
+        amount=req.amount,
+        note=req.note
+    )
+    
+    try:
+        result = await execute_simulated_transfer(sim_req)
+        return result
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error(f"❌ Erreur transfert M1 : {e}")
+        raise HTTPException(status_code=500, detail="Erreur interne lors du transfert")
+
+
+
+@router.get("/institutions/overview")
+async def institutions_overview(token_data: Dict = Depends(require_valid_token)):
+    if token_data.get("role") not in ["Admin", "Agent de Crédit", "Administrateur"]:
+        # We need to re-fetch the user to get the role if not in token_data
+        from modules.common.database import get_user_by_username
+        user = get_user_by_username(token_data["primary"])
+        if user["role"] not in ["Admin", "Agent de Crédit", "Administrateur"]:
+            raise HTTPException(status_code=403, detail="Accès réservé aux institutions")
+
+    from modules.common.database import get_all_loan_dossiers, get_all_users
+    dossiers = get_all_loan_dossiers()
+    all_users = get_all_users()
+    clients = [u for u in all_users if u["role"] == "Client"]
+    
+    return {
+        "dossiers": dossiers,
+        "clients_count": len(clients),
+        "pending_count": len([d for d in dossiers if d["status"] == "PENDING"]),
+        "approved_count": len([d for d in dossiers if d["status"] == "APPROVED"])
+    }
+
+class LoanActionRequest(BaseModel):
+    dossier_id: int
+    action: str # APPROVE or REJECT
+
+@router.post("/loan/process")
+async def process_loan(req: LoanActionRequest, token_data: Dict = Depends(require_valid_token)):
+    from modules.common.database import update_loan_status, log_event
+    status = "APPROVED" if req.action == "APPROVE" else "REJECTED"
+    update_loan_status(req.dossier_id, status)
+    
+    log_event(
+        user_id=token_data["primary"],
+        action=f"LOAN_{req.action}",
+        target=str(req.dossier_id),
+        result="SUCCESS",
+        details=f"Dossier {req.dossier_id} marqué comme {status}"
+    )
+    
+    return {"message": f"Dossier {status}", "status": status}

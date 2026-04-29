@@ -217,6 +217,19 @@ async def root():
 async def health():
     return {"status": "UP", "timestamp": datetime.now().isoformat()}
 
+@app.get("/stats/public")
+async def public_stats():
+    # Simulation de données dynamiques basées sur l'heure/date
+    import random
+    day_seed = datetime.now().day
+    random.seed(day_seed)
+    return {
+        "total_users": 7450 + random.randint(10, 100),
+        "total_transactions": 258400 + random.randint(1000, 5000),
+        "active_partners": 18,
+        "availability": "99.98%"
+    }
+
 # Service du Frontend React
 frontend_dist = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
 frontend_assets = os.path.join(frontend_dist, "assets")

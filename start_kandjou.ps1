@@ -1,7 +1,7 @@
-# --- Kandjou Unified Starter (v4.2 - Soutenance) ---
+﻿# --- Kandjou Unified Starter (v4.2 - Soutenance) ---
 # Ce script lance l'ensemble du projet Kandjou sur un port unique (8000)
 
-Write-Host "--- Kandjou Fintech : Dmarrage du systme ---" -ForegroundColor Cyan
+Write-Host "--- Kandjou Fintech : DÃ©marrage du systÃ¨me ---" -ForegroundColor Cyan
 
 # 1. Nettoyage des processus existants
 Write-Host "[1/3] Nettoyage des ports..." -ForegroundColor Yellow
