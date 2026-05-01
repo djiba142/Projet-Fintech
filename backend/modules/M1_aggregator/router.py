@@ -34,6 +34,7 @@ load_dotenv()
 logger = logging.getLogger("aggregator")
 
 router = APIRouter()
+TRANSFER_STATUS = {} # État global pour le suivi temps réel
 
 # --- Auth Helper (Direct Memory Access) ---
 async def require_valid_token(authorization: Optional[str] = Header(None)) -> Dict:
@@ -63,7 +64,8 @@ async def require_valid_token(authorization: Optional[str] = Header(None)) -> Di
     return {
         "msisdn_orange": session.get("msisdn_orange"),
         "msisdn_mtn": session.get("msisdn_mtn"),
-        "primary": session.get("primary")
+        "primary": session.get("primary"),
+        "role": session.get("role")
     }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -181,23 +183,40 @@ async def aggregate(
     Utilise les numéros Orange et MTN stockés dans le token M3 ou en base.
     Le {msisdn} dans l'URL sert de référence client (primary).
     """
-    # Si l'utilisateur demande ses propres données ou si c'est un Admin/Agent
-    msisdn_orange = token_data.get("msisdn_orange")
-    msisdn_mtn = token_data.get("msisdn_mtn")
+    # --- SÉCURITÉ D'ACCÈS (ÉQUIVALENT RLS) ---
+    user_role = token_data.get("role")
     primary = token_data.get("primary")
     
-    # Si c'est un Admin ou un Agent demandant pour un autre client, on récupère les MSISDN en base
-    if token_data.get("role") in ["Admin", "Agent", "Regulateur"] and msisdn != primary:
-        from modules.common.database import get_user_by_username
-        target_user = get_user_by_username(msisdn)
-        if target_user:
-            msisdn_orange = target_user.get("msisdn_orange")
-            msisdn_mtn = target_user.get("msisdn_mtn")
-            primary = msisdn
-    else:
-        primary = token_data.get("primary", msisdn)
+    # 1. Le client ne peut voir que ses propres données
+    if user_role == "Client" and msisdn != primary:
+        logger.warning(f"❌ Accès refusé : Client {primary} tente d'accéder à {msisdn}")
+        raise HTTPException(status_code=403, detail="Accès interdit : vous ne pouvez consulter que votre propre dossier.")
     
-    logger.info(f"📣 Agrégation déclenchée | Primary: {primary} | Orange: {msisdn_orange} | MTN: {msisdn_mtn}")
+    # 2. L'administrateur et le régulateur n'ont pas accès aux détails financiers (Ségrégation des tâches)
+    if user_role in ["Administrateur", "Régulateur (BCRG)"]:
+        logger.warning(f"❌ Accès refusé : {user_role} tente d'accéder aux données confidentielles de {msisdn}")
+        raise HTTPException(status_code=403, detail=f"Accès interdit : les {user_role}s n'ont pas accès aux détails financiers des clients.")
+
+    # 3. L'agent ne peut voir que ses dossiers autorisés
+    if user_role == "Agent de Crédit" and msisdn != primary:
+        from modules.common.database import get_all_loan_dossiers
+        dossiers = get_all_loan_dossiers()
+        # Vérification si un dossier existe pour ce client lié à cet agent
+        is_authorized = any(d["client_id"] == msisdn and d["agent_id"] == primary for d in dossiers)
+        if not is_authorized:
+            logger.warning(f"❌ Accès refusé : Agent {primary} n'est pas autorisé pour le client {msisdn}")
+            raise HTTPException(status_code=403, detail="Accès interdit : aucun dossier de crédit actif pour ce client auprès de votre institution.")
+
+    # Si autorisé, on récupère les MSISDN en base pour le client cible
+    from modules.common.database import get_user_by_username
+    target_user = get_user_by_username(msisdn)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="Client non trouvé")
+        
+    msisdn_orange = target_user.get("msisdn_orange")
+    msisdn_mtn = target_user.get("msisdn_mtn")
+    
+    logger.info(f"📣 Agrégation autorisée | Demandeur: {primary} ({user_role}) | Cible: {msisdn}")
     
     # Appels asynchrones directs vers les fonctions de M2
     tasks = []
@@ -254,6 +273,8 @@ async def aggregate(
             "sources_active": active_sources,
             "orange_balance": next((s.balance for s in sources if s.operator == "ORANGE"), 0),
             "mtn_balance": next((s.balance for s in sources if s.operator == "MTN"), 0),
+            "revenu_mensuel": sum(s.balance for s in sources) * 0.45, # Simulation basée sur flux
+            "depense_mensuelle": sum(s.balance for s in sources) * 0.30
         },
         "credit_analysis": credit_analysis.dict(),
         "timestamp": datetime.utcnow().isoformat()
@@ -264,10 +285,14 @@ async def aggregate(
         action="SCORING_AGGREGATION",
         target=primary,
         result=credit_analysis.status,
-        details=f"ReportID: {report_id} | Score: {credit_analysis.score}"
+        details=f"Score: {credit_analysis.score}"
     )
-    
     return result
+
+@router.get("/score/{msisdn}")
+async def get_score_alias(msisdn: str, token_data: Dict = Depends(require_valid_token)):
+    """Alias pour /aggregate/{msisdn} utilisé par le frontend."""
+    return await aggregate(msisdn, token_data=token_data)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Gestion des Transactions (M1 Aggregated)
@@ -278,7 +303,7 @@ async def fetch_orange_transactions(msisdn: str) -> List[dict]:
     from modules.M2_simulators.router import get_orange_transactions
     try:
         data = await get_orange_transactions(msisdn)
-        return [{"id": t["id"], "date": t["date"], "desc": t["desc"], "type": t["type"], "amount": t["amount"], "status": t["status"], "op": "ORANGE"} for t in data]
+        return [{"id": t["id"], "date": t["date"], "desc": t["desc"], "receiver": t["desc"], "type": t["type"], "amount": t["amount"], "status": t["status"], "op": "ORANGE"} for t in data]
     except Exception: return []
 
 async def fetch_mtn_transactions(msisdn: str) -> List[dict]:
@@ -286,8 +311,25 @@ async def fetch_mtn_transactions(msisdn: str) -> List[dict]:
     from modules.M2_simulators.router import get_mtn_transactions
     try:
         data = await get_mtn_transactions(msisdn)
-        return [{"id": t["id"], "date": t["date"], "desc": t["desc"], "type": t["type"], "amount": t["amount"], "status": t["status"], "op": "MTN"} for t in data]
+        return [{"id": t["id"], "date": t["date"], "desc": t["desc"], "receiver": t["desc"], "type": t["type"], "amount": t["amount"], "status": t["status"], "op": "MTN"} for t in data]
     except Exception: return []
+
+async def get_transactions_internal(username: str):
+    """Fonction interne pour récupérer les transactions agrégées."""
+    from modules.common.database import get_user_by_username
+    target_user = get_user_by_username(username)
+    if not target_user: return {"transactions": []}
+    msisdn_orange = target_user.get("msisdn_orange")
+    msisdn_mtn = target_user.get("msisdn_mtn")
+    tasks = []
+    tasks.append(fetch_orange_transactions(msisdn_orange) if msisdn_orange else asyncio.sleep(0, []))
+    tasks.append(fetch_mtn_transactions(msisdn_mtn) if msisdn_mtn else asyncio.sleep(0, []))
+    results = await asyncio.gather(*tasks)
+    all_tx = []
+    for res in results:
+        if isinstance(res, list): all_tx.extend(res)
+    all_tx.sort(key=lambda x: x["date"], reverse=True)
+    return {"transactions": all_tx}
 
 @router.get("/transactions/{msisdn}")
 async def get_aggregated_transactions(
@@ -301,7 +343,7 @@ async def get_aggregated_transactions(
     msisdn_mtn = token_data.get("msisdn_mtn")
     
     # Sécurité : un client ne peut voir que ses propres transactions
-    if token_data.get("role") not in ["Admin", "Agent", "Regulateur"] and msisdn != token_data.get("primary"):
+    if token_data.get("role") not in ["Administrateur", "Agent de Crédit", "Régulateur (BCRG)"] and msisdn != token_data.get("primary"):
          msisdn = token_data.get("primary")
          
     tasks = []
@@ -373,41 +415,240 @@ async def process_transfer(
 
 @router.get("/institutions/overview")
 async def institutions_overview(token_data: Dict = Depends(require_valid_token)):
-    if token_data.get("role") not in ["Admin", "Agent de Crédit", "Administrateur"]:
-        # We need to re-fetch the user to get the role if not in token_data
-        from modules.common.database import get_user_by_username
-        user = get_user_by_username(token_data["primary"])
-        if user["role"] not in ["Admin", "Agent de Crédit", "Administrateur"]:
-            raise HTTPException(status_code=403, detail="Accès réservé aux institutions")
-
-    from modules.common.database import get_all_loan_dossiers, get_all_users
-    dossiers = get_all_loan_dossiers()
-    all_users = get_all_users()
-    clients = [u for u in all_users if u["role"] == "Client"]
+    from modules.common.database import get_db_connection
     
-    return {
-        "dossiers": dossiers,
-        "clients_count": len(clients),
-        "pending_count": len([d for d in dossiers if d["status"] == "PENDING"]),
-        "approved_count": len([d for d in dossiers if d["status"] == "APPROVED"])
-    }
+    # Vérification du rôle
+    role = token_data.get("role")
+    if role not in ["Administrateur", "Agent de Crédit", "Régulateur (BCRG)"]:
+        raise HTTPException(status_code=403, detail="Accès réservé aux institutions")
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Récupération de tous les clients avec leur dernier score connu s'il existe
+        cursor.execute("""
+            SELECT 
+                u.username, u.fullname, u.msisdn_orange, u.msisdn_mtn, u.status,
+                (SELECT score FROM loan_dossiers WHERE client_id = u.username ORDER BY created_at DESC LIMIT 1) as last_score
+            FROM users u
+            WHERE u.role = 'Client'
+        """)
+        clients = cursor.fetchall()
+        
+        # Statistiques globales
+        cursor.execute("SELECT COUNT(*) as count FROM loan_dossiers WHERE status = 'PENDING'")
+        pending_count = cursor.fetchone()['count']
+        
+        cursor.execute("SELECT COUNT(*) as count FROM loan_dossiers WHERE status = 'APPROVED'")
+        approved_count = cursor.fetchone()['count']
+        
+        cursor.execute("SELECT AVG(score) as avg_score FROM loan_dossiers")
+        avg_score = cursor.fetchone()['avg_score'] or 0
+
+        conn.close()
+        
+        return {
+            "clients": [dict(c) for c in clients],
+            "clients_count": len(clients),
+            "pending_count": pending_count,
+            "approved_count": approved_count,
+            "avg_score": round(float(avg_score), 1)
+        }
+    except Exception as e:
+        logger.error(f"Erreur institutions_overview: {e}")
+        raise HTTPException(status_code=500, detail="Erreur serveur lors de la récupération des données")
+
+@router.get("/institutions/dossiers")
+async def get_all_dossiers(token_data: Dict = Depends(require_valid_token)):
+    from modules.common.database import get_db_connection
+    
+    role = token_data.get("role")
+    if role not in ["Administrateur", "Agent de Crédit"]:
+        raise HTTPException(status_code=403, detail="Accès réservé")
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM loan_dossiers ORDER BY created_at DESC")
+        dossiers = cursor.fetchall()
+        conn.close()
+        return {"dossiers": [dict(d) for d in dossiers]}
+    except Exception as e:
+        logger.error(f"Erreur get_all_dossiers: {e}")
+        raise HTTPException(status_code=500, detail="Erreur serveur")
 
 class LoanActionRequest(BaseModel):
     dossier_id: int
     action: str # APPROVE or REJECT
 
-@router.post("/loan/process")
-async def process_loan(req: LoanActionRequest, token_data: Dict = Depends(require_valid_token)):
-    from modules.common.database import update_loan_status, log_event
-    status = "APPROVED" if req.action == "APPROVE" else "REJECTED"
-    update_loan_status(req.dossier_id, status)
+from fastapi import APIRouter, HTTPException, Path, Request, Depends, Header, Query, status, Body, WebSocket, WebSocketDisconnect
+
+# Gestion des flux de transactions par utilisateur (Global)
+TRANSACTION_STREAMS = {}
+
+@router.websocket("/ws/transactions/{username}")
+async def transactions_live_websocket(websocket: WebSocket, username: str):
+    await websocket.accept()
+    if username not in TRANSACTION_STREAMS:
+        TRANSACTION_STREAMS[username] = set()
+    TRANSACTION_STREAMS[username].add(websocket)
+    logger.info(f"📊 Dashboard Live connecté pour: {username}")
+    try:
+        while True:
+            await websocket.receive_text() # Garde la connexion ouverte
+    except WebSocketDisconnect:
+        TRANSACTION_STREAMS[username].remove(websocket)
+        logger.info(f"📊 Dashboard Live déconnecté pour: {username}")
+
+async def broadcast_transaction_update(username: str, data: dict):
+    """Envoie une mise à jour à tous les WebSockets d'un utilisateur."""
+    if username in TRANSACTION_STREAMS:
+        disconnected = set()
+        for ws in TRANSACTION_STREAMS[username]:
+            try:
+                await ws.send_json(data)
+            except Exception:
+                disconnected.add(ws)
+        for ws in disconnected:
+            TRANSACTION_STREAMS[username].remove(ws)
+
+@router.websocket("/ws/transfer/{tx_id}")
+async def transfer_status_websocket(websocket: WebSocket, tx_id: str):
+    await websocket.accept()
+    logger.info(f"🔌 WebSocket connecté pour la transaction: {tx_id}")
+    try:
+        last_status = None
+        while True:
+            current_data = TRANSFER_STATUS.get(tx_id)
+            if not current_data:
+                await asyncio.sleep(0.5)
+                continue
+            
+            if current_data["status"] != last_status:
+                await websocket.send_json(current_data)
+                last_status = current_data["status"]
+            
+            if last_status in ["SUCCESS", "FAILED"]:
+                await asyncio.sleep(2)
+                break
+                
+            await asyncio.sleep(0.5)
+    except WebSocketDisconnect:
+        pass
+
+@router.post("/transfer/v2")
+async def initiate_transfer_v2(
+    req: UnifiedTransferRequest,
+    token_data: Dict = Depends(require_valid_token)
+):
+    import uuid
+    tx_id = f"KDJ-{uuid.uuid4().hex[:8].upper()}"
+    username = token_data["primary"]
     
-    log_event(
-        user_id=token_data["primary"],
-        action=f"LOAN_{req.action}",
-        target=str(req.dossier_id),
-        result="SUCCESS",
-        details=f"Dossier {req.dossier_id} marqué comme {status}"
-    )
+    TRANSFER_STATUS[tx_id] = {
+        "tx_id": tx_id,
+        "username": username,
+        "status": "INITIATED",
+        "message": "Initialisation...",
+        "progress": 10,
+        "amount": req.amount,
+        "recipient": req.to_msisdn,
+        "operator": req.operator,
+        "timestamp": datetime.now().isoformat()
+    }
     
-    return {"message": f"Dossier {status}", "status": status}
+    # Notifier le dashboard d'une nouvelle transaction
+    await broadcast_transaction_update(username, {
+        "type": "NEW_TRANSACTION",
+        "data": TRANSFER_STATUS[tx_id]
+    })
+    
+    asyncio.create_task(simulate_transfer_process(tx_id, req, username, token_data))
+    return {"tx_id": tx_id, "status": "PENDING"}
+
+async def simulate_transfer_process(tx_id: str, req: UnifiedTransferRequest, username: str, token_data: Dict):
+    from modules.M2_simulators.router import execute_simulated_transfer, TransferRequest
+    try:
+        # Step 1: Validation
+        await asyncio.sleep(1.5)
+        TRANSFER_STATUS[tx_id].update({"status": "VALIDATING", "message": "Sécurité...", "progress": 30})
+        await broadcast_transaction_update(username, {"type": "UPDATE", "data": TRANSFER_STATUS[tx_id]})
+        
+        # Step 2: Opérateur
+        await asyncio.sleep(2)
+        TRANSFER_STATUS[tx_id].update({"status": "PROCESSING", "message": f"Contact {req.operator}...", "progress": 60})
+        await broadcast_transaction_update(username, {"type": "UPDATE", "data": TRANSFER_STATUS[tx_id]})
+        
+        # Step 3: Action réelle (Mutation en DB/Mock)
+        await asyncio.sleep(1.5)
+        try:
+            # Détermination du MSISDN source correct depuis la session
+            if req.operator == "ORANGE":
+                from_msisdn = token_data.get("msisdn_orange") or username
+            else:
+                from_msisdn = token_data.get("msisdn_mtn") or username
+            
+            sim_req = TransferRequest(
+                operator=req.operator,
+                from_msisdn=from_msisdn,
+                to_msisdn=req.to_msisdn,
+                amount=req.amount,
+                note=req.note
+            )
+            result = await execute_simulated_transfer(sim_req)
+            
+            TRANSFER_STATUS[tx_id].update({
+                "status": "SUCCESS", "message": "Terminé", "progress": 100,
+                "details": {
+                    "amount": req.amount, 
+                    "recipient": req.to_msisdn, 
+                    "operator": req.operator,
+                    "transaction_id": result["transaction_id"],
+                    "interoperability": result["interoperability"]
+                }
+            })
+        except Exception as e:
+            logger.error(f"Erreur M2 Mutation: {e}")
+            TRANSFER_STATUS[tx_id].update({"status": "FAILED", "message": str(e), "progress": 100})
+        
+        await broadcast_transaction_update(username, {"type": "UPDATE", "data": TRANSFER_STATUS[tx_id]})
+
+    except Exception as e:
+        logger.error(f"Err simulate {tx_id}: {e}")
+
+# ... reste du fichier ...
+@router.get("/m1/analytics/{username}")
+async def get_user_analytics(username: str, token_data: Dict = Depends(require_valid_token)):
+    """Calcule les agrégats financiers pour les graphiques."""
+    from datetime import datetime, timedelta
+    
+    # 1. Récupérer toutes les transactions
+    tx_data = await get_transactions_internal(username)
+    transactions = tx_data.get("transactions", [])
+    
+    # 2. Initialiser les 7 derniers jours
+    today = datetime.now().date()
+    days = [(today - timedelta(days=i)) for i in range(6, -1, -1)]
+    labels = [d.strftime("%a") for d in days] # Lun, Mar, etc.
+    income = [0] * 7
+    expense = [0] * 7
+    
+    # 3. Ventiler les transactions
+    for tx in transactions:
+        try:
+            tx_date = datetime.fromisoformat(tx["date"]).date()
+            if tx_date in days:
+                idx = days.index(tx_date)
+                if tx["type"] == "CREDIT":
+                    income[idx] += tx["amount"]
+                else:
+                    expense[idx] += tx["amount"]
+        except: continue
+        
+    return {
+        "labels": labels,
+        "income": income,
+        "expense": expense,
+        "score": 78 # Simulation d'un score dynamique
+    }

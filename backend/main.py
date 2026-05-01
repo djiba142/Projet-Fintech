@@ -38,7 +38,7 @@ def generate_kandjou_report(data: PDFExportRequest):
     pdf.rect(0, 0, 210, 50, 'F')
     
     # Logo
-    logo_path = os.path.join(os.path.dirname(__file__), "..", "frontend", "public", "kandjou.png")
+    logo_path = os.path.join(os.path.dirname(__file__), "..", "frontend", "public", "logo_kandjou.png")
     if os.path.exists(logo_path):
         pdf.image(logo_path, 15, 12, 25)
     

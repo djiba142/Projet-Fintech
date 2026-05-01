@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime, timedelta
 from typing import Optional, Dict, List
-from fastapi import APIRouter, HTTPException, Request, Body, status, Query
+from fastapi import APIRouter, HTTPException, Request, Body, status, Query, Header, Depends
 from pydantic import BaseModel
 
 from .utils import OTPStorage, generate_secure_token
@@ -44,13 +44,15 @@ import os
 SESSIONS_FILE = "sessions.json"
 
 def load_sessions():
-    global ACTIVE_SESSIONS
     if os.path.exists(SESSIONS_FILE):
         try:
             with open(SESSIONS_FILE, "r") as f:
-                ACTIVE_SESSIONS = json.load(f)
+                data = json.load(f)
+                ACTIVE_SESSIONS.clear()
+                ACTIVE_SESSIONS.update(data)
                 logger.info(f"💾 {len(ACTIVE_SESSIONS)} sessions chargées depuis sessions.json")
-        except: pass
+        except Exception as e:
+            logger.error(f"Erreur chargement sessions: {e}")
 
 def save_sessions():
     try:
@@ -73,8 +75,10 @@ async def login(req: LoginRequest):
     if user["status"] == "suspended":
         raise HTTPException(status_code=403, detail="Votre compte est suspendu. Contactez l'administrateur.")
     
-    # Génération d'un token de session utilisateur
-    token = f"KANDJOU_SESSION_{generate_secure_token()}"
+    # Génération des tokens
+    access_token = f"KANDJOU_ACCESS_{generate_secure_token()}"
+    refresh_token = f"KANDJOU_REFRESH_{generate_secure_token()}"
+    
     session_data = {
         "username": req.username,
         "role": user["role"],
@@ -82,14 +86,49 @@ async def login(req: LoginRequest):
         "primary": req.username,
         "msisdn_orange": user.get("msisdn_orange"),
         "msisdn_mtn": user.get("msisdn_mtn"),
-        "created_at": datetime.now().isoformat()
+        "created_at": datetime.now().isoformat(),
+        "expires_at": (datetime.now() + timedelta(hours=2)).isoformat()
     }
-    ACTIVE_SESSIONS[token] = session_data
+    
+    ACTIVE_SESSIONS[access_token] = session_data
+    # On lie le refresh token à l'access token pour simplification dans cette simulation
+    ACTIVE_SESSIONS[refresh_token] = {**session_data, "type": "refresh", "linked_to": access_token}
+    
     save_sessions()
     
     log_event(req.username, "LOGIN_SUCCESS", result="SUCCESS", details=f"Rôle: {user['role']}")
     logger.info(f"✅ Connexion réussie : {req.username} (Rôle: {user['role']})")
-    return {"token": token, "role": user["role"], "fullname": user["fullname"], "language": user.get("language", "FR")}
+    
+    return {
+        "access_token": access_token, 
+        "refresh_token": refresh_token,
+        "role": user["role"],
+        "fullname": user["fullname"],
+        "email": user.get("email")
+    }
+
+@router.post("/auth/refresh")
+async def refresh_token(refresh_token: str = Body(..., embed=True)):
+    if refresh_token not in ACTIVE_SESSIONS or ACTIVE_SESSIONS[refresh_token].get("type") != "refresh":
+        raise HTTPException(status_code=401, detail="Refresh token invalide")
+    
+    session_data = ACTIVE_SESSIONS[refresh_token]
+    new_access_token = f"KANDJOU_ACCESS_{generate_secure_token()}"
+    
+    # Créer une nouvelle session d'accès
+    ACTIVE_SESSIONS[new_access_token] = {
+        "username": session_data["username"],
+        "role": session_data["role"],
+        "fullname": session_data["fullname"],
+        "primary": session_data["username"],
+        "msisdn_orange": session_data.get("msisdn_orange"),
+        "msisdn_mtn": session_data.get("msisdn_mtn"),
+        "created_at": datetime.now().isoformat(),
+        "expires_at": (datetime.now() + timedelta(hours=2)).isoformat()
+    }
+    
+    save_sessions()
+    return {"access_token": new_access_token}
 
 class RegisterRequest(BaseModel):
     username: str
@@ -162,90 +201,183 @@ async def verify_otp(req: OTPVerify):
     logger.info(f"✅ OTP Validé pour {session_data['primary']} | Token: {access_token}")
     return {"token": access_token}
 
-@router.get("/auth/validate-token")
-async def validate_token_get(token: str = Query(...)):
-    session = ACTIVE_SESSIONS.get(token)
+# --- Dépendances de sécurité ---
+
+async def require_valid_token(token: Optional[str] = Query(None), authorization: Optional[str] = Header(None)):
+    actual_token = token
+    if authorization and authorization.startswith("Bearer "):
+        actual_token = authorization.split(" ")[1]
+        
+    if not actual_token:
+        raise HTTPException(status_code=401, detail="Token manquant")
+        
+    session = ACTIVE_SESSIONS.get(actual_token)
     if not session:
-        raise HTTPException(status_code=401, detail="Token invalide")
-    
-    # Vérification d'expiration si c'est un token d'accès scoring
-    if session.get("type") == "scoring_access":
-        expiry = datetime.fromisoformat(session["expires_at"])
-        if datetime.now() > expiry:
-            del ACTIVE_SESSIONS[token]
-            raise HTTPException(status_code=401, detail="Token expiré")
-            
+        raise HTTPException(status_code=401, detail="Session invalide ou expirée")
     return session
 
-@router.post("/auth/validate-token")
-async def validate_token_post(token: str = Body(..., embed=True)):
-    return await validate_token_get(token)
+async def require_admin_token(token: Optional[str] = Query(None), authorization: Optional[str] = Header(None)):
+    session = await require_valid_token(token, authorization)
+    if session.get("role") != "Administrateur":
+        log_event(session.get("username"), "UNAUTHORIZED_ADMIN_ACCESS", result="DENIED")
+        raise HTTPException(status_code=403, detail="Privilèges Administrateur requis")
+    return session
 
-@router.get("/admin/audit-logs")
-async def get_audit_logs_endpoint(limit: int = 100):
-    from modules.common.database import get_audit_logs
-    return get_audit_logs(limit)
+async def require_regulator_token(token: Optional[str] = Query(None), authorization: Optional[str] = Header(None)):
+    session = await require_valid_token(token, authorization)
+    if session.get("role") not in ["Administrateur", "Régulateur (BCRG)"]:
+        log_event(session.get("username"), "UNAUTHORIZED_REGULATOR_ACCESS", result="DENIED")
+        raise HTTPException(status_code=403, detail="Privilèges Régulateur (BCRG) requis")
+    return session
 
-@router.get("/admin/users")
-async def get_all_users_endpoint():
-    from modules.common.database import get_all_users
-    return get_all_users()
-
-class CreateUserRequest(BaseModel):
-    username: str
-    password: str
-    role: str
-    fullname: str
-
-@router.post("/admin/create-user")
-async def create_user_endpoint(req: CreateUserRequest):
-    from modules.common.database import create_user
-    res = create_user(req.username, req.password, req.role, req.fullname)
-    if "error" in res:
-        raise HTTPException(status_code=400, detail=res["error"])
-    return res
-
-@router.post("/admin/toggle-user")
-async def toggle_user_endpoint(username: str = Body(..., embed=True)):
-    from modules.common.database import toggle_user_status
-    return toggle_user_status(username)
-
-@router.get("/admin/alerts")
-async def get_alerts_endpoint():
-    return SECURITY_ALERTS
-
-class UpdateLangRequest(BaseModel):
-    username: str
-    language: str
-
-@router.post("/auth/update-language")
-async def update_language(req: UpdateLangRequest):
-    from modules.common.database import get_db_connection
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("UPDATE users SET language = %s WHERE username = %s", (req.language, req.username))
-    conn.commit()
-    conn.close()
-    return {"message": "Langue mise à jour", "language": req.language}
+# --- Endpoints Régulateur (BCRG) ---
 
 # --- Endpoints Administratifs ---
 
 @router.get("/admin/system-overview")
-async def get_system_overview():
+async def get_system_overview(admin_session: Dict = Depends(require_admin_token)):
     """Retourne l'état complet du système pour le Dashboard Admin."""
     from modules.common.database import get_all_users
+    
+    users = get_all_users()
+    agents_count = len([u for u in users if u["role"] == "Agent de Crédit"])
+    
     return {
         "system_status": {
             "m1_aggregator": "online",
             "m2_simulators": "online",
-            "m3_security": "online"
+            "m3_security": "online",
+            "api_orange": "online",
+            "api_mtn": "online"
         },
-        "users": get_all_users(),
+        "users": users,
         "security_alerts": SECURITY_ALERTS,
         "stats": {
+            "total_users": len(users),
+            "total_transactions": 14502,
+            "total_agents": agents_count,
+            "total_institutions": 5,
             "total_scorings_today": 124,
             "avg_latency": "320ms",
             "active_sessions": len(ACTIVE_SESSIONS)
+        },
+        "api_monitoring": {
+            "orange": {"status": "online", "latency": "145ms", "last_check": "Il y a 2 min"},
+            "mtn": {"status": "online", "latency": "190ms", "last_check": "Il y a 1 min"}
         }
     }
+
+@router.get("/admin/transactions")
+async def get_all_transactions(limit: int = 50, admin_session: Dict = Depends(require_admin_token)):
+    return [
+        {"id": "TX-9981", "client": "Kadiatou Bah", "type": "TRANSFERT", "amount": "500 000 GNF", "status": "SUCCESS", "time": "14:45"},
+        {"id": "TX-9980", "client": "Mamadou Diallo", "type": "CREDIT", "amount": "1 200 000 GNF", "status": "SUCCESS", "time": "14:30"},
+        {"id": "TX-9979", "client": "Fatoumata Sylla", "type": "DEPOT", "amount": "150 000 GNF", "status": "SUCCESS", "time": "14:15"}
+    ]
+
+@router.post("/admin/create-user")
+async def create_user_endpoint(data: Dict = Body(...), admin_session: Dict = Depends(require_admin_token)):
+    from modules.common.database import create_user
+    try:
+        create_user(data["username"], data["password"], data["role"], data["fullname"], data.get("username"))
+        log_event(admin_session["username"], "CREATE_USER", target=data["username"], details=f"Rôle: {data['role']}")
+        return {"message": "Utilisateur créé"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/admin/test-api")
+async def test_api(provider: str = Body(..., embed=True), admin_session: Dict = Depends(require_admin_token)):
+    import random
+    success = random.choice([True, True, True, False])
+    return {"status": "success" if success else "error", "message": f"Test API {provider} terminé."}
+
+@router.post("/admin/delete-user")
+async def delete_user_endpoint(username: str = Body(..., embed=True), admin_session: Dict = Depends(require_admin_token)):
+    from modules.common.database import delete_user
+    delete_user(username)
+    log_event(admin_session["username"], "DELETE_USER", target=username, result="SUCCESS")
+    return {"message": "Utilisateur supprimé"}
+
+@router.post("/admin/update-role")
+async def update_role_endpoint(username: str = Body(...), role: str = Body(...), admin_session: Dict = Depends(require_admin_token)):
+    from modules.common.database import update_user_role
+    update_user_role(username, role)
+    log_event(admin_session["username"], "UPDATE_USER_ROLE", target=username, details=f"Nouveau rôle: {role}")
+    return {"message": "Rôle mis à jour"}
+
+@router.post("/admin/toggle-user")
+async def toggle_user_endpoint(username: str = Body(..., embed=True), admin_session: Dict = Depends(require_admin_token)):
+    from modules.common.database import toggle_user_status
+    res = toggle_user_status(username)
+    log_event(admin_session["username"], "TOGGLE_USER_STATUS", target=username, details=f"Nouveau statut: {res.get('new_status')}")
+    return res
+
+@router.get("/admin/report/download")
+async def download_admin_report(admin_session: Dict = Depends(require_admin_token)):
+    from modules.common.database import get_all_users, get_audit_logs
+    from fastapi.responses import StreamingResponse
+    import io
+    users = get_all_users()
+    logs = get_audit_logs(20)
+    report = "=== RAPPORT ADMINISTRATIF KANDJOU ===\n"
+    report += f"Genere par: {admin_session['username']}\n\n"
+    report += "--- UTILISATEURS ---\n"
+    for u in users:
+        report += f"  {u['username']} | {u['role']} | {u['status']}\n"
+    report += f"\nTotal: {len(users)} utilisateurs\n\n"
+    report += "--- DERNIERS LOGS ---\n"
+    for l in logs:
+        report += f"  [{l.get('timestamp','')}] {l.get('user_id','')} - {l.get('action','')}\n"
+    log_event(admin_session["username"], "DOWNLOAD_REPORT", result="SUCCESS")
+    buffer = io.BytesIO(report.encode("utf-8"))
+    return StreamingResponse(buffer, media_type="text/plain", headers={"Content-Disposition": "attachment; filename=rapport_kandjou.txt"})
+
+# --- Endpoints Régulateur (BCRG) ---
+
+@router.get("/audit/overview")
+async def get_audit_overview(reg_session: Dict = Depends(require_regulator_token)):
+    """Tableau de bord global pour le régulateur."""
+    from modules.common.database import get_all_users
+    
+    users = get_all_users()
+    institutions_count = len([u for u in users if u["role"] == "Agent de Crédit"]) 
+    
+    return {
+        "stats": {
+            "total_transactions": 245896,
+            "total_volume": "1 450 000 000 GNF",
+            "active_users": len([u for u in users if u["status"] == "active"]),
+            "connected_institutions": institutions_count
+        },
+        "anomalies_count": 12,
+        "compliance_rate": "98.5%",
+        "recent_alerts": [
+            {"id": 1, "type": "MONTANT_ÉLEVÉ", "desc": "Transaction > 15M GNF détectée", "target": "Client #442", "time": "10:30"},
+            {"id": 2, "type": "ACTIVITÉ_SUSPECTE", "desc": "Transferts multiples rapides", "target": "Client #118", "time": "09:15"}
+        ]
+    }
+
+@router.get("/audit/institutions")
+async def get_audit_institutions(reg_session: Dict = Depends(require_regulator_token)):
+    """Liste des institutions financières surveillées."""
+    return [
+        {"id": "MF-001", "name": "BKR Microfinance", "status": "CONFORME", "last_audit": "12/04/2024", "risk": "FAIBLE"},
+        {"id": "MF-002", "name": "Kandjou Crédit", "status": "EN RÉVISION", "last_audit": "05/05/2024", "risk": "MODÉRÉ"}
+    ]
+
+@router.post("/audit/report/generate")
+async def generate_regulatory_report(reg_session: Dict = Depends(require_regulator_token)):
+    """Simule la génération d'un rapport de conformité BCRG."""
+    log_event(reg_session["username"], "GENERATE_REGULATORY_REPORT", result="SUCCESS")
+    return {"message": "Rapport BCRG généré avec succès", "download_url": "/audit/report/download/rep-2024.pdf"}
+
+@router.get("/audit/logs")
+async def get_regulator_logs(limit: int = 100, reg_session: Dict = Depends(require_regulator_token)):
+    from modules.common.database import get_audit_logs
+    return get_audit_logs(limit)
+
+@router.post("/audit/resolve-alert")
+async def resolve_alert(alert_id: int = Body(..., embed=True), reg_session: Dict = Depends(require_regulator_token)):
+    log_event(reg_session["username"], "RESOLVE_ALERT", target=str(alert_id), result="SUCCESS")
+    return {"message": "Alerte marquée comme traitée"}
 

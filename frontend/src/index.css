@@ -4,8 +4,8 @@
 :root {
   --bg-light: #F8FAF9;
   --text-dark: #1A1A1A;
-  --kandjou-green: #0f7b3f;
-  --sidebar-width: 260px;
+  --kandjou-green: #006233;
+  --sidebar-width: 240px;
 }
 
 * {
@@ -21,7 +21,6 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Sidebar Styles (Base) */
 .sidebar {
   width: var(--sidebar-width);
   height: 100vh;
@@ -33,24 +32,14 @@ body {
   z-index: 100;
 }
 
-.sidebar-client {
-  background-color: #004d28;
-}
-
-.sidebar-institution {
-  background-color: #1a2b4b;
-}
-
-.sidebar-regulator {
-  background-color: #4c1d95;
-}
+.sidebar-institution { background-color: #006233; }
 
 .nav-item {
   display: flex;
   align-items: center;
   gap: 1rem;
   padding: 0.8rem 1rem;
-  border-radius: 8px;
+  border-radius: 12px;
   color: rgba(255, 255, 255, 0.7);
   text-decoration: none;
   font-size: 0.9rem;
@@ -59,85 +48,28 @@ body {
   margin-bottom: 0.5rem;
 }
 
-.nav-item:hover,
-.nav-item.active {
+.nav-item:hover, .nav-item.active {
   background-color: rgba(255, 255, 255, 0.1);
   color: white;
 }
 
-/* Card Styles */
-.kandjou-card {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  padding: 1.5rem;
+/* Global Premium Utilities */
+.pro-shadow { box-shadow: 0 10px 40px rgba(0,0,0,0.03); }
+.rounded-32 { border-radius: 32px; }
+
+/* Custom Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #f1f1f1; }
+::-webkit-scrollbar-thumb { background: #006233; border-radius: 10px; }
+
+/* Dashboard layout fix */
+.dashboard-container {
+  margin-left: var(--sidebar-width);
+  min-height: 100vh;
+  padding: 0;
 }
 
-.balance-card-orange {
-  background: #f37021;
-  color: white;
-}
-
-.balance-card-mtn {
-  background: #ffcc00;
-  color: #1a2b4b;
-}
-
-/* Button Styles */
-.btn-primary-kandjou {
-  background-color: #006233;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  padding: 0.8rem 1.5rem;
-  font-weight: 700;
-  cursor: pointer;
-  width: 100%;
-}
-
-/* Animations for Landing Page */
-@keyframes float {
-
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-
-  50% {
-    transform: translateY(-15px);
-  }
-}
-
-.animate-float {
-  animation: float 6s ease-in-out infinite;
-}
-
-.animate-float-delayed {
-  animation: float 6s ease-in-out infinite 3s;
-}
-
-/* Dashboard Responsive */
 @media (max-width: 768px) {
-  .dashboard-cards-grid {
-    grid-template-columns: 1fr !important;
-  }
-
-  .dashboard-actions-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
-  }
-}
-
-/* Notification pulse */
-@keyframes pulse-dot {
-
-  0%,
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-
-  50% {
-    opacity: 0.5;
-    transform: scale(1.5);
-  }
+  .dashboard-container { margin-left: 0; }
+  .sidebar { transform: translateX(-100%); }
 }

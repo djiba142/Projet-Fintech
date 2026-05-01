@@ -1,10 +1,14 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { translations } from "../i18n";
+import { useAuth } from "../context/AuthContext";
+
+const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 export default function Header() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
   const [lang, setLang] = useState(localStorage.getItem("kandjou_lang") || "FR");
   const [showLang, setShowLang] = useState(false);
 
@@ -19,11 +23,9 @@ export default function Header() {
     window.dispatchEvent(new Event("languageChange"));
 
     // Sync with backend if logged in
-    const userRaw = localStorage.getItem("kandjou_user");
-    if (userRaw) {
-      const user = JSON.parse(userRaw);
+    if (user?.username) {
       try {
-        await fetch("http://localhost:8000/m3/auth/update-language", {
+        await fetch(`${API}/m3/auth/update-language`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ username: user.username, language: code })
@@ -109,8 +111,23 @@ export default function Header() {
           )}
         </div>
 
-        <button onClick={() => navigate("/login")} style={s.btnSec}>{t.login}</button>
-        <button onClick={() => navigate("/register")} style={s.btnPrim}>{t.register}</button>
+        {user ? (
+          <button 
+            onClick={() => {
+              const dest = user.role === "Agent de Crédit" ? "/agent" : 
+                           user.role === "Administrateur" ? "/admin" : "/dashboard";
+              navigate(dest);
+            }} 
+            style={s.btnPrim}
+          >
+            Dashboard
+          </button>
+        ) : (
+          <>
+            <button onClick={() => navigate("/login")} style={s.btnSec}>{t.login}</button>
+            <button onClick={() => navigate("/register")} style={s.btnPrim}>{t.register}</button>
+          </>
+        )}
       </div>
     </header>
   );

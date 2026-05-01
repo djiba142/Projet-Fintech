@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import axios from "axios";
 
-const API = "http://localhost:8000/m3";
+const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 const ROLE_ROUTES = {
   "Client": "/dashboard",
@@ -14,6 +15,7 @@ const ROLE_ROUTES = {
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const { login, isAuthenticated, user } = useAuth();
 
   const [form, setForm] = useState({ username: "", password: "" });
   const [error, setError] = useState("");
@@ -21,12 +23,19 @@ export default function LoginPage() {
   const [showPwd, setShowPwd] = useState(false);
   const [remember, setRemember] = useState(false);
 
-  // ─── Mot de passe oublié ───
+  // États pour la réinitialisation
   const [showReset, setShowReset] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
+  const [resetError, setResetError] = useState("");
   const [resetLoading, setResetLoading] = useState(false);
   const [resetDone, setResetDone] = useState(false);
-  const [resetError, setResetError] = useState("");
+
+  // Rediriger si déjà connecté
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      navigate(ROLE_ROUTES[user.role] || "/dashboard");
+    }
+  }, [isAuthenticated, user, navigate]);
 
   useEffect(() => {
     const saved = localStorage.getItem("kandjou_remember");
@@ -36,7 +45,6 @@ export default function LoginPage() {
     }
   }, []);
 
-  // ─── Login ───
   const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
@@ -45,22 +53,15 @@ export default function LoginPage() {
       return;
     }
     setLoading(true);
-    try {
-      const res = await axios.post(`${API}/auth/login`, {
-        username: form.username.trim(),
-        password: form.password,
-      });
-      const { token, role, fullname, language } = res.data;
-      localStorage.setItem("kandjou_token", token);
-      localStorage.setItem("kandjou_user", JSON.stringify({ username: form.username.trim(), role, fullname, language }));
+    
+    const result = await login(form.username.trim(), form.password);
+    
+    if (result.success) {
       if (remember) localStorage.setItem("kandjou_remember", form.username.trim());
       else localStorage.removeItem("kandjou_remember");
-      navigate(ROLE_ROUTES[role] || "/dashboard");
-    } catch (err) {
-      if (err.response?.status === 401) setError("Identifiants incorrects. Vérifiez votre numéro et mot de passe.");
-      else if (err.response?.status === 403) setError("Votre compte est suspendu. Contactez l'administrateur.");
-      else setError("Erreur de connexion au serveur. Réessayez.");
-    } finally {
+      // La redirection est gérée par le useEffect ci-dessus
+    } else {
+      setError(result.message);
       setLoading(false);
     }
   };
@@ -184,7 +185,7 @@ export default function LoginPage() {
       <div className="login-card" style={S.card}>
         {/* ── Bandeau vert + logo ── */}
         <div style={S.greenHeader}>
-          <img src="/logo_kandjou.png" alt="Kandjou" style={S.logoImg} onClick={() => navigate("/")} />
+          <img src="/logo_kandjou.png" alt="Kandjou" style={{ ...S.logoImg, filter: "brightness(0) invert(1)" }} onClick={() => navigate("/")} />
         </div>
 
         <div style={S.body}>

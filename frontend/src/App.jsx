@@ -7,17 +7,23 @@ import TransactionsPage from "./pages/TransactionsPage";
 import TransferPage     from "./pages/TransferPage";
 import ScorePage        from "./pages/ScorePage";
 import ProfilePage      from "./pages/ProfilePage";
+import NotificationsPage from "./pages/NotificationsPage";
 import AgentDashboard   from "./pages/AgentDashboard";
 import ClientDetailPage from "./pages/ClientDetailPage";
 import AdminDashboard   from "./pages/AdminDashboard";
 import RiskDashboard    from "./pages/RiskDashboard";
 import AuditPage        from "./pages/AuditPage";
+import { AuthProvider, useAuth } from "./context/AuthContext";
+import MainLayout from "./components/MainLayout";
 import "./App.css";
 
+// --- Sécurisation du Routage ---
 function PrivateRoute({ children, allowedRoles }) {
-  const raw = localStorage.getItem("kandjou_user");
-  if (!raw) return <Navigate to="/login" replace />;
-  const user = JSON.parse(raw);
+  const { user, loading } = useAuth();
+  
+  if (loading) return <div>Chargement...</div>;
+  if (!user || !user.role) return <Navigate to="/login" replace />;
+
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     const map = {
       "Client": "/dashboard",
@@ -31,77 +37,93 @@ function PrivateRoute({ children, allowedRoles }) {
   return children;
 }
 
+// --- Centralisation du Layout ---
+function LayoutRoute({ children, allowedRoles }) {
+  return (
+    <PrivateRoute allowedRoles={allowedRoles}>
+      <MainLayout>{children}</MainLayout>
+    </PrivateRoute>
+  );
+}
+
 export default function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        {/* Public */}
-        <Route path="/"         element={<LandingPage />} />
-        <Route path="/login"    element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
+      <AuthProvider>
+        <Routes>
+          {/* Pages Publiques */}
+          <Route path="/"         element={<LandingPage />} />
+          <Route path="/login"    element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
 
-        {/* Client */}
-        <Route path="/dashboard" element={
-          <PrivateRoute allowedRoles={["Client", "Administrateur"]}>
-            <ClientDashboard />
-          </PrivateRoute>
-        } />
-        <Route path="/transactions" element={
-          <PrivateRoute allowedRoles={["Client", "Administrateur"]}>
-            <TransactionsPage />
-          </PrivateRoute>
-        } />
-        <Route path="/transfers" element={
-          <PrivateRoute allowedRoles={["Client", "Administrateur"]}>
-            <TransferPage />
-          </PrivateRoute>
-        } />
-        <Route path="/score" element={
-          <PrivateRoute allowedRoles={["Client", "Administrateur"]}>
-            <ScorePage />
-          </PrivateRoute>
-        } />
-        <Route path="/profile" element={
-          <PrivateRoute allowedRoles={["Client", "Administrateur"]}>
-            <ProfilePage />
-          </PrivateRoute>
-        } />
+          {/* Accès Client */}
+          <Route path="/dashboard" element={
+            <LayoutRoute allowedRoles={["Client", "Administrateur"]}>
+              <ClientDashboard />
+            </LayoutRoute>
+          } />
+          <Route path="/transactions" element={
+            <LayoutRoute allowedRoles={["Client", "Administrateur"]}>
+              <TransactionsPage />
+            </LayoutRoute>
+          } />
+          <Route path="/transfers" element={
+            <LayoutRoute allowedRoles={["Client", "Administrateur"]}>
+              <TransferPage />
+            </LayoutRoute>
+          } />
+          <Route path="/score" element={
+            <LayoutRoute allowedRoles={["Client", "Administrateur"]}>
+              <ScorePage />
+            </LayoutRoute>
+          } />
+          <Route path="/profile" element={
+            <LayoutRoute allowedRoles={["Client", "Agent de Crédit", "Administrateur", "Analyste Risque", "Régulateur (BCRG)"]}>
+              <ProfilePage />
+            </LayoutRoute>
+          } />
+          <Route path="/notifications" element={
+            <LayoutRoute allowedRoles={["Client", "Agent de Crédit", "Administrateur", "Analyste Risque", "Régulateur (BCRG)"]}>
+              <NotificationsPage />
+            </LayoutRoute>
+          } />
 
-        {/* Institution financière */}
-        <Route path="/agent" element={
-          <PrivateRoute allowedRoles={["Agent de Crédit", "Administrateur"]}>
-            <AgentDashboard />
-          </PrivateRoute>
-        } />
-        <Route path="/client-detail" element={
-          <PrivateRoute allowedRoles={["Agent de Crédit", "Administrateur"]}>
-            <ClientDetailPage />
-          </PrivateRoute>
-        } />
+          {/* Accès Institution (Agent) */}
+          <Route path="/agent" element={
+            <LayoutRoute allowedRoles={["Agent de Crédit", "Administrateur"]}>
+              <AgentDashboard />
+            </LayoutRoute>
+          } />
+          <Route path="/client-detail" element={
+            <LayoutRoute allowedRoles={["Agent de Crédit", "Administrateur"]}>
+              <ClientDetailPage />
+            </LayoutRoute>
+          } />
 
-        {/* Administrateur */}
-        <Route path="/admin" element={
-          <PrivateRoute allowedRoles={["Administrateur"]}>
-            <AdminDashboard />
-          </PrivateRoute>
-        } />
+          {/* Accès Administrateur */}
+          <Route path="/admin" element={
+            <LayoutRoute allowedRoles={["Administrateur"]}>
+              <AdminDashboard />
+            </LayoutRoute>
+          } />
 
-        {/* Analyste Risque */}
-        <Route path="/risk" element={
-          <PrivateRoute allowedRoles={["Analyste Risque", "Administrateur"]}>
-            <RiskDashboard />
-          </PrivateRoute>
-        } />
+          {/* Accès Analyste Risque */}
+          <Route path="/risk" element={
+            <LayoutRoute allowedRoles={["Analyste Risque", "Administrateur"]}>
+              <RiskDashboard />
+            </LayoutRoute>
+          } />
 
-        {/* Régulateur BCRG */}
-        <Route path="/audit" element={
-          <PrivateRoute allowedRoles={["Administrateur", "Analyste Risque", "Régulateur (BCRG)"]}>
-            <AuditPage />
-          </PrivateRoute>
-        } />
+          {/* Accès Régulateur BCRG */}
+          <Route path="/audit" element={
+            <LayoutRoute allowedRoles={["Administrateur", "Analyste Risque", "Régulateur (BCRG)"]}>
+              <AuditPage />
+            </LayoutRoute>
+          } />
 
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </AuthProvider>
     </BrowserRouter>
   );
 }
