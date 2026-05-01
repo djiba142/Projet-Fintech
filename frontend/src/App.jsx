@@ -13,6 +13,9 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminLogs from "./pages/admin/AdminLogs";
 import AdminSettings from "./pages/admin/AdminSettings";
+import AdminRoles from "./pages/admin/AdminRoles";
+import AdminInstitutions from "./pages/admin/AdminInstitutions";
+import AdminTransactions from "./pages/admin/AdminTransactions";
 import RiskDashboard    from "./pages/risk/RiskDashboard";
 import AuditDashboard from "./pages/audit/AuditDashboard";
 import AuditTransactions from "./pages/audit/AuditTransactions";
@@ -127,6 +130,21 @@ export default function App() {
           <Route path="/admin-settings" element={
             <LayoutRoute allowedRoles={["Administrateur"]}>
               <AdminSettings />
+            </LayoutRoute>
+          } />
+          <Route path="/admin-roles" element={
+            <LayoutRoute allowedRoles={["Administrateur"]}>
+              <AdminRoles />
+            </LayoutRoute>
+          } />
+          <Route path="/admin-institutions" element={
+            <LayoutRoute allowedRoles={["Administrateur"]}>
+              <AdminInstitutions />
+            </LayoutRoute>
+          } />
+          <Route path="/admin-transactions" element={
+            <LayoutRoute allowedRoles={["Administrateur"]}>
+              <AdminTransactions />
             </LayoutRoute>
           } />
 

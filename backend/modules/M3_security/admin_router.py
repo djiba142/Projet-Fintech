@@ -133,3 +133,43 @@ async def update_admin_config(req: ConfigUpdateRequest, token_data: Dict = Depen
     conn.commit()
     conn.close()
     return {"status": "updated"}
+
+# ─── GESTION DES INSTITUTIONS ───
+@router.get("/institutions")
+async def get_admin_institutions(token_data: Dict = Depends(require_valid_token)):
+    if token_data.get("role") != "Administrateur":
+        raise HTTPException(status_code=403, detail="Accès réservé")
+    
+    # Mock data pour les institutions (Orange, MTN)
+    return [
+        {"id": "orange_money", "name": "Orange Money", "status": "ACTIVE", "uptime": "99.9%", "latency": "120ms", "success_rate": "98.5%"},
+        {"id": "mtn_momo", "name": "MTN MoMo", "status": "ACTIVE", "uptime": "99.7%", "latency": "145ms", "success_rate": "97.2%"},
+        {"id": "bcrg_api", "name": "BCRG Sync", "status": "ACTIVE", "uptime": "100%", "latency": "45ms", "success_rate": "100%"}
+    ]
+
+# ─── GESTION DES TRANSACTIONS GLOBALES ───
+@router.get("/transactions")
+async def get_admin_all_transactions(token_data: Dict = Depends(require_valid_token)):
+    if token_data.get("role") != "Administrateur":
+        raise HTTPException(status_code=403, detail="Accès réservé")
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM transactions ORDER BY date DESC LIMIT 200")
+    txs = cursor.fetchall()
+    conn.close()
+    return txs
+
+# ─── ROLES & PERMISSIONS ───
+@router.get("/roles")
+async def get_admin_roles(token_data: Dict = Depends(require_valid_token)):
+    if token_data.get("role") != "Administrateur":
+        raise HTTPException(status_code=403, detail="Accès réservé")
+    
+    return [
+        {"role": "Client", "permissions": ["VIEW_OWN_WALLET", "TRANSFER_FUNDS", "VIEW_HISTORY"]},
+        {"role": "Agent de Crédit", "permissions": ["VIEW_CLIENTS", "ANALYZE_RISK", "APPROVE_LOAN"]},
+        {"role": "Analyste Risque", "permissions": ["VIEW_ALL_RISKS", "EDIT_SCORING_RULES", "GLOBAL_DECISION"]},
+        {"role": "Régulateur (BCRG)", "permissions": ["AUDIT_ALL", "VIEW_AML_ALERTS", "EXPORT_COMPLIANCE"]},
+        {"role": "Administrateur", "permissions": ["ALL_ACCESS", "MANAGE_USERS", "SYSTEM_CONFIG"]}
+    ]

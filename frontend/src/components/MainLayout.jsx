@@ -62,7 +62,10 @@ export default function MainLayout({ children }) {
       return [
         { path: "/admin", label: "Dashboard Système", icon: Home },
         { path: "/admin-users", label: "Utilisateurs", icon: Users },
-        { path: "/admin-logs", label: "Journaux (Logs)", icon: Terminal },
+        { path: "/admin-roles", label: "Rôles & Accès", icon: ShieldCheck },
+        { path: "/admin-institutions", label: "Institutions & APIs", icon: Building2 },
+        { path: "/admin-transactions", label: "Transactions", icon: Activity },
+        { path: "/admin-logs", label: "Logs d'Audit", icon: Terminal },
         { path: "/admin-settings", label: "Configuration", icon: Settings },
         { path: "/profile", label: "Profil Admin", icon: User },
       ];
