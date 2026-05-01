@@ -8,31 +8,44 @@ import {
   CheckCircle2, 
   Search,
   ExternalLink,
-  Plus
+  Plus,
+  Loader2,
+  Settings,
+  RefreshCw
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import axios from "axios";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
+const S = {
+  miniStat: { background: "#F8FAFC", padding: "1rem", borderRadius: 16, border: "1px solid #F1F5F9" },
+  statLab: { margin: 0, fontSize: "0.65rem", fontWeight: 800, color: "#94A3B8", textTransform: "uppercase" },
+  statVal: { margin: "4px 0 0", fontSize: "0.95rem", fontWeight: 900, color: "#1E293B" }
+};
+
 export default function AdminInstitutions() {
   const { token } = useAuth();
   const [institutions, setInstitutions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchInst = async () => {
+    try {
+      setRefreshing(true);
+      const res = await axios.get(`${API}/m3/admin/institutions`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setInstitutions(res.data);
+    } catch (err) {
+      console.error("Fetch Inst Error", err);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchInst = async () => {
-      try {
-        const res = await axios.get(`${API}/m3/admin/institutions`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setInstitutions(res.data);
-      } catch (err) {
-        console.error("Fetch Inst Error", err);
-      } finally {
-        setLoading(false);
-      }
-    };
     if (token) fetchInst();
   }, [token]);
 
@@ -44,9 +57,20 @@ export default function AdminInstitutions() {
           <h1 style={{ fontSize: "1.8rem", fontWeight: 950, color: "#1E293B", margin: 0 }}>Gestion des Institutions</h1>
           <p style={{ margin: 0, fontSize: "0.85rem", color: "#64748B", fontWeight: 600 }}>Supervision des APIs Orange, MTN et des banques partenaires</p>
         </div>
-        <button style={{ padding: "10px 20px", borderRadius: 12, background: "#1E293B", color: "#fff", border: "none", fontWeight: 900, fontSize: "0.85rem", display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-           <Plus size={18} /> Ajouter une institution
-        </button>
+        <div style={{ display: "flex", gap: 12 }}>
+          <button 
+            onClick={fetchInst}
+            style={{ padding: "10px", borderRadius: 12, background: "#fff", border: "1.5px solid #E2E8F0", cursor: "pointer" }}
+          >
+            <RefreshCw size={18} color="#64748B" className={refreshing ? "animate-spin" : ""} />
+          </button>
+          <button 
+            onClick={() => alert("Ouverture du formulaire d'ajout d'institution...")}
+            style={{ padding: "10px 20px", borderRadius: 12, background: "#1E293B", color: "#fff", border: "none", fontWeight: 900, fontSize: "0.85rem", display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}
+          >
+             <Plus size={18} /> Ajouter une institution
+          </button>
+        </div>
       </header>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "2rem" }}>
@@ -67,9 +91,12 @@ export default function AdminInstitutions() {
                        </div>
                     </div>
                  </div>
-                 <button style={{ background: "none", border: "none", color: "#3B82F6", cursor: "pointer" }}>
+                 <button 
+                    onClick={() => alert(`Accès au monitoring externe de ${inst.name}...`)}
+                    style={{ background: "none", border: "none", color: "#3B82F6", cursor: "pointer" }}
+                  >
                     <ExternalLink size={18} />
-                 </button>
+                  </button>
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1.5rem" }}>
@@ -92,8 +119,11 @@ export default function AdminInstitutions() {
                  </div>
               </div>
 
-              <button style={{ width: "100%", padding: "10px", borderRadius: 12, border: "1.5px solid #F1F5F9", background: "#fff", color: "#1E293B", fontSize: "0.8rem", fontWeight: 900, cursor: "pointer" }}>
-                 Configurer l'API
+              <button 
+                onClick={() => alert(`Chargement de la console de configuration API pour ${inst.name}...`)}
+                style={{ width: "100%", padding: "10px", borderRadius: 12, border: "1.5px solid #F1F5F9", background: "#fff", color: "#1E293B", fontSize: "0.8rem", fontWeight: 900, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+              >
+                 <Settings size={16} /> Configurer l'API
               </button>
            </div>
          ))}
@@ -102,9 +132,3 @@ export default function AdminInstitutions() {
     </div>
   );
 }
-
-const S = {
-  miniStat: { background: "#F8FAFC", padding: "1rem", borderRadius: 16, border: "1px solid #F1F5F9" },
-  statLab: { margin: 0, fontSize: "0.65rem", fontWeight: 800, color: "#94A3B8", textTransform: "uppercase" },
-  statVal: { margin: "4px 0 0", fontSize: "0.95rem", fontWeight: 900, color: "#1E293B" }
-};
