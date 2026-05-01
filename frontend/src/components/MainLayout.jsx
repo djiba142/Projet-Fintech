@@ -14,7 +14,8 @@ import {
   Users,
   Activity,
   Building2,
-  ShieldAlert
+  ShieldAlert,
+  Target
 } from "lucide-react";
 
 import { useAuth } from "../context/AuthContext";
@@ -65,10 +66,12 @@ export default function MainLayout({ children }) {
       ];
     }
 
-    // Menu Analyste Risque
+    // Menu Analyste Risque (Moteur de Décision)
     if (role === "Analyste Risque") {
       return [
-        { path: "/risk", label: "Politique Risque", icon: ShieldCheck },
+        { path: "/risk", label: "Dashboard Risque", icon: Home },
+        { path: "/risk-clients", label: "Répertoire Clients", icon: Users },
+        { path: "/audit-alerts", label: "Alertes Risque", icon: AlertTriangle },
         { path: "/profile", label: "Mon Profil", icon: User },
       ];
     }
@@ -94,7 +97,8 @@ export default function MainLayout({ children }) {
   const getSidebarBg = () => {
     if (role === "Client") return "#006233"; // Exact mockup Green
     if (role === "Administrateur") return "#1E293B";
-    if (role === "Régulateur (BCRG)") return "#0F172A"; // Authority Navy
+    if (role === "Régulateur (BCRG)") return "#0F172A"; 
+    if (role === "Analyste Risque") return "#334155"; // Analytical Slate
     return "#004d28";
   };
 

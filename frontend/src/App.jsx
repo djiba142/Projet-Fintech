@@ -11,12 +11,14 @@ import NotificationsPage from "./pages/NotificationsPage";
 import AgentDashboard   from "./pages/AgentDashboard";
 import ClientDetailPage from "./pages/ClientDetailPage";
 import AdminDashboard   from "./pages/AdminDashboard";
-import RiskDashboard    from "./pages/RiskDashboard";
+import RiskDashboard    from "./pages/risk/RiskDashboard";
 import AuditDashboard from "./pages/audit/AuditDashboard";
 import AuditTransactions from "./pages/audit/AuditTransactions";
 import AuditAlerts from "./pages/audit/AuditAlerts";
 import AuditInstitutions from "./pages/audit/AuditInstitutions";
 import AuditReports from "./pages/audit/AuditReports";
+import RiskClients from "./pages/risk/RiskClients";
+import RiskAnalysis from "./pages/risk/RiskAnalysis";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import MainLayout from "./components/MainLayout";
 import "./App.css";
@@ -115,6 +117,16 @@ export default function App() {
           <Route path="/risk" element={
             <LayoutRoute allowedRoles={["Analyste Risque", "Administrateur"]}>
               <RiskDashboard />
+            </LayoutRoute>
+          } />
+          <Route path="/risk-clients" element={
+            <LayoutRoute allowedRoles={["Analyste Risque", "Administrateur"]}>
+              <RiskClients />
+            </LayoutRoute>
+          } />
+          <Route path="/risk-analysis" element={
+            <LayoutRoute allowedRoles={["Analyste Risque", "Administrateur"]}>
+              <RiskAnalysis />
             </LayoutRoute>
           } />
 

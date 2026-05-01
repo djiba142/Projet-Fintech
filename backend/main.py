@@ -169,6 +169,7 @@ load_dotenv()
 # Import des routers
 from modules.M1_aggregator.router import router as m1_router
 from modules.M1_aggregator.audit_router import router as audit_router
+from modules.M1_aggregator.risk_router import router as risk_router
 from modules.M2_simulators.router import router as m2_router
 from modules.M3_security.router import router as m3_router
 
@@ -199,6 +200,7 @@ async def log_requests(request: Request, call_next):
 # Montage des modules
 app.include_router(m1_router, prefix="/m1", tags=["M1 - Aggregator"])
 app.include_router(audit_router, prefix="/m1/audit", tags=["BCRG - Audit & Supervision"])
+app.include_router(risk_router, prefix="/m1/risk", tags=["Risk - Analyst Decision Engine"])
 app.include_router(m2_router, prefix="/m2", tags=["M2 - Simulators"])
 app.include_router(m3_router, prefix="/m3", tags=["M3 - Security & OTP"])
 
