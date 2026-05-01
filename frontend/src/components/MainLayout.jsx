@@ -16,7 +16,8 @@ import {
   Building2,
   ShieldAlert,
   Target,
-  Terminal
+  Terminal,
+  Settings
 } from "lucide-react";
 import logoKandjou from "../assets/logo_kandjou.png";
 

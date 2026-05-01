@@ -42,6 +42,10 @@ body {
   animation: fadeIn 0.4s ease-out forwards;
 }
 
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
 /* Utilitaires */
 .text-cobalt { color: #1976D2; }
 .text-coral { color: #f87171; }

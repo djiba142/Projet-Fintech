@@ -8,7 +8,8 @@ import {
   TrendingUp, 
   ArrowUpRight, 
   Clock,
-  ArrowRight
+  ArrowRight,
+  Loader2
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
@@ -151,23 +152,26 @@ export default function AuditDashboard() {
           </div>
           <button 
             onClick={() => {
+              if (auditing) return;
               setAuditing(true);
               setTimeout(() => {
                 setAuditing(false);
                 alert("Audit national terminé. Aucune anomalie critique détectée dans les journaux des institutions.");
               }, 3000);
             }}
-            disabled={auditing}
             style={{
               width: "100%", marginTop: "2rem", padding: "1rem", borderRadius: 16,
-              background: auditing ? "#F1F5F9" : "#0F172A", 
-              border: "none", color: auditing ? "#94A3B8" : "#fff", fontWeight: 900,
+              background: auditing ? "#F8FAFC" : "#0F172A", 
+              border: auditing ? "2px solid #E2E8F0" : "none",
+              color: auditing ? "#94A3B8" : "#fff", fontWeight: 900,
               fontSize: "0.85rem", cursor: auditing ? "not-allowed" : "pointer", 
               display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-              transition: "all 0.3s"
+              transition: "all 0.2s",
+              boxShadow: auditing ? "none" : "0 4px 12px rgba(15, 23, 42, 0.2)"
             }}
           >
-            {auditing ? "Analyse en cours..." : "Lancer un Audit Complet"} <ArrowRight size={18} />
+            {auditing ? <Loader2 size={18} className="animate-spin" /> : <ArrowRight size={18} />}
+            {auditing ? "Analyse en cours..." : "Lancer un Audit Complet"}
           </button>
         </div>
 
