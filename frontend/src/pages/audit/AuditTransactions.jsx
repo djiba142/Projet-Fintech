@@ -48,11 +48,16 @@ export default function AuditTransactions() {
   }, [token, opFilter, minAmount]);
 
   const filtered = useMemo(() => {
-    return transactions.filter(t => 
-      t.receiver.toLowerCase().includes(search.toLowerCase()) ||
-      t.client_id?.toLowerCase().includes(search.toLowerCase()) ||
-      t.amount.toString().includes(search)
-    );
+    return transactions.filter(t => {
+      const rec = t.receiver || "";
+      const cid = t.client_id || "";
+      const amt = t.amount?.toString() || "";
+      const s = search.toLowerCase();
+      
+      return rec.toLowerCase().includes(s) || 
+             cid.toLowerCase().includes(s) || 
+             amt.includes(s);
+    });
   }, [transactions, search]);
 
   return (

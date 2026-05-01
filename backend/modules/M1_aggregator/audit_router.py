@@ -100,6 +100,7 @@ async def get_audit_transactions(
         t['op'] = t['operator']
         t['date'] = t['created_at']
         t['desc'] = t['description']
+        t['receiver'] = t['receiver'] or "N/A"
         
         # Scoring Fraude Basique (AML)
         score = 0

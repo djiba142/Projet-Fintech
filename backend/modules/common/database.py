@@ -105,6 +105,7 @@ def init_db():
             operator VARCHAR(20), -- ORANGE, MTN
             type VARCHAR(20), -- DEBIT, CREDIT
             amount DECIMAL(15, 2),
+            receiver VARCHAR(190),
             description TEXT,
             status VARCHAR(20) DEFAULT 'SUCCESS',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -180,12 +181,13 @@ def init_db():
                 op,
                 tx_type,
                 amt,
+                f"+2246200000{i%10}",
                 f"Transaction test {i+1}",
                 "SUCCESS"
             ))
         cursor.executemany("""
-            INSERT INTO transactions (tx_id, client_id, operator, type, amount, description, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO transactions (tx_id, client_id, operator, type, amount, receiver, description, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """, txs)
     conn.commit()
     conn.close()
