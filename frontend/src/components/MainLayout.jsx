@@ -15,7 +15,8 @@ import {
   Activity,
   Building2,
   ShieldAlert,
-  Target
+  Target,
+  Terminal
 } from "lucide-react";
 
 import { useAuth } from "../context/AuthContext";
@@ -56,12 +57,13 @@ export default function MainLayout({ children }) {
       ];
     }
 
-    // Menu Administrateur
+    // Menu Administrateur (Command Center)
     if (role === "Administrateur") {
       return [
-        { path: "/admin", label: "Système", icon: Home },
-        { path: "/admin?view=users", label: "Utilisateurs", icon: Users },
-        { path: "/audit", label: "Supervision BCRG", icon: Activity },
+        { path: "/admin", label: "Dashboard Système", icon: Home },
+        { path: "/admin-users", label: "Utilisateurs", icon: Users },
+        { path: "/admin-logs", label: "Journaux (Logs)", icon: Terminal },
+        { path: "/admin-settings", label: "Configuration", icon: Settings },
         { path: "/profile", label: "Profil Admin", icon: User },
       ];
     }

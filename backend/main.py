@@ -172,6 +172,7 @@ from modules.M1_aggregator.audit_router import router as audit_router
 from modules.M1_aggregator.risk_router import router as risk_router
 from modules.M2_simulators.router import router as m2_router
 from modules.M3_security.router import router as m3_router
+from modules.M3_security.admin_router import router as admin_router
 
 app = FastAPI(
     title="Kandjou Fintech - Unified Backend",
@@ -203,6 +204,7 @@ app.include_router(audit_router, prefix="/m1/audit", tags=["BCRG - Audit & Super
 app.include_router(risk_router, prefix="/m1/risk", tags=["Risk - Analyst Decision Engine"])
 app.include_router(m2_router, prefix="/m2", tags=["M2 - Simulators"])
 app.include_router(m3_router, prefix="/m3", tags=["M3 - Security & OTP"])
+app.include_router(admin_router, prefix="/m3/admin", tags=["Admin - System Control Center"])
 
 @app.post("/export-pdf", tags=["Utility"])
 async def export_pdf(data: PDFExportRequest):

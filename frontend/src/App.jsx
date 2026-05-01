@@ -8,9 +8,11 @@ import TransferPage     from "./pages/TransferPage";
 import ScorePage        from "./pages/ScorePage";
 import ProfilePage      from "./pages/ProfilePage";
 import NotificationsPage from "./pages/NotificationsPage";
-import AgentDashboard   from "./pages/AgentDashboard";
 import ClientDetailPage from "./pages/ClientDetailPage";
-import AdminDashboard   from "./pages/AdminDashboard";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import AdminUsers from "./pages/admin/AdminUsers";
+import AdminLogs from "./pages/admin/AdminLogs";
+import AdminSettings from "./pages/admin/AdminSettings";
 import RiskDashboard    from "./pages/risk/RiskDashboard";
 import AuditDashboard from "./pages/audit/AuditDashboard";
 import AuditTransactions from "./pages/audit/AuditTransactions";
@@ -110,6 +112,21 @@ export default function App() {
           <Route path="/admin" element={
             <LayoutRoute allowedRoles={["Administrateur"]}>
               <AdminDashboard />
+            </LayoutRoute>
+          } />
+          <Route path="/admin-users" element={
+            <LayoutRoute allowedRoles={["Administrateur"]}>
+              <AdminUsers />
+            </LayoutRoute>
+          } />
+          <Route path="/admin-logs" element={
+            <LayoutRoute allowedRoles={["Administrateur"]}>
+              <AdminLogs />
+            </LayoutRoute>
+          } />
+          <Route path="/admin-settings" element={
+            <LayoutRoute allowedRoles={["Administrateur"]}>
+              <AdminSettings />
             </LayoutRoute>
           } />
 
