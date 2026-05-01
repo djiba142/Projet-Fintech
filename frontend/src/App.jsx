@@ -8,6 +8,7 @@ import TransferPage     from "./pages/TransferPage";
 import ScorePage        from "./pages/ScorePage";
 import ProfilePage      from "./pages/ProfilePage";
 import NotificationsPage from "./pages/NotificationsPage";
+import AgentDashboard   from "./pages/AgentDashboard";
 import ClientDetailPage from "./pages/ClientDetailPage";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminUsers from "./pages/admin/AdminUsers";
