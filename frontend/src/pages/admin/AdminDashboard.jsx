@@ -131,11 +131,21 @@ export default function AdminDashboard() {
            <div style={{ background: "#FEE2E2", borderRadius: 32, padding: "2rem", border: "1px solid #FECACA" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: "1rem" }}>
                  <ShieldAlert color="#DC2626" />
-                 <h3 style={{ fontSize: "1rem", fontWeight: 900, color: "#991B1B", margin: 0 }}>Alerte Sécurité</h3>
+                 <h3 style={{ fontSize: "1rem", fontWeight: 900, color: "#991B1B", margin: 0 }}>Alerte Système</h3>
               </div>
-              <p style={{ fontSize: "0.8rem", color: "#991B1B", fontWeight: 600, lineHeight: 1.5, margin: 0 }}>
-                 3 tentatives de connexion infructueuses détectées depuis l'IP 197.234.12.98. Surveillance activée.
-              </p>
+              {data?.recent_alerts && data.recent_alerts.length > 0 ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                   {data.recent_alerts.slice(0, 2).map((a, i) => (
+                     <p key={i} style={{ fontSize: "0.8rem", color: "#991B1B", fontWeight: 600, lineHeight: 1.5, margin: 0 }}>
+                        ● {a.details}
+                     </p>
+                   ))}
+                </div>
+              ) : (
+                <p style={{ fontSize: "0.8rem", color: "#991B1B", fontWeight: 600, lineHeight: 1.5, margin: 0 }}>
+                   Aucune alerte de sécurité critique détectée dans les dernières 24h.
+                </p>
+              )}
            </div>
         </div>
 

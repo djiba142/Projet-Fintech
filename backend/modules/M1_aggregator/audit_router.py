@@ -1,5 +1,6 @@
 import logging
 import asyncio
+import sqlite3
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict
 from fastapi import APIRouter, HTTPException, Depends, Query, Body
@@ -78,14 +79,16 @@ async def get_audit_transactions(
     if token_data.get("role") != "Régulateur (BCRG)":
         raise HTTPException(status_code=403, detail="Accès réservé")
 
+    from modules.common.database import get_db_connection, get_placeholder
     conn = get_db_connection()
-    cursor = conn.cursor()
+    cursor = conn.cursor(dictionary=True) if not isinstance(conn, sqlite3.Connection) else conn.cursor()
+    p = get_placeholder()
     
-    query = "SELECT * FROM transactions WHERE amount >= ?"
+    query = f"SELECT * FROM transactions WHERE amount >= {p}"
     params = [min_amount]
     
     if operator:
-        query += " AND operator = ?"
+        query += f" AND operator = {p}"
         params.append(operator.upper())
     
     query += " ORDER BY created_at DESC"
@@ -97,15 +100,15 @@ async def get_audit_transactions(
     for r in rows:
         t = dict(r)
         # On mappe les noms de colonnes pour la compatibilité frontend
-        t['op'] = t['operator']
-        t['date'] = t['created_at']
-        t['desc'] = t['description']
-        t['receiver'] = t['receiver'] or "N/A"
+        t['op'] = t.get('operator')
+        t['date'] = t.get('created_at')
+        t['desc'] = t.get('description')
+        t['receiver'] = t.get('receiver') or "N/A"
         
         # Scoring Fraude Basique (AML)
         score = 0
-        if t['amount'] > 1000000: score += 40
-        if t['status'] != 'SUCCESS': score += 10
+        if t.get('amount', 0) > 1000000: score += 40
+        if t.get('status') != 'SUCCESS': score += 10
         t['fraud_score'] = score
         t['risk_level'] = "HIGH" if score >= 40 else "MEDIUM" if score >= 20 else "LOW"
         all_system_tx.append(t)
@@ -117,8 +120,9 @@ async def get_audit_alerts(token_data: Dict = Depends(require_valid_token)):
     if token_data.get("role") != "Régulateur (BCRG)":
         raise HTTPException(status_code=403, detail="Accès réservé")
     
+    from modules.common.database import get_db_connection
     conn = get_db_connection()
-    cursor = conn.cursor()
+    cursor = conn.cursor(dictionary=True) if not isinstance(conn, sqlite3.Connection) else conn.cursor()
     cursor.execute("SELECT * FROM audit_alerts ORDER BY created_at DESC")
     alerts = [dict(a) for a in cursor.fetchall()]
     conn.close()
@@ -129,10 +133,12 @@ async def process_alert(req: AlertActionRequest, token_data: Dict = Depends(requ
     if token_data.get("role") != "Régulateur (BCRG)":
         raise HTTPException(status_code=403, detail="Accès réservé")
     
+    from modules.common.database import get_db_connection, get_placeholder
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("UPDATE audit_alerts SET status = ?, details = ? WHERE id = ?", (req.new_status, req.note, req.alert_id))
-    conn.commit()
+    p = get_placeholder()
+    cursor.execute(f"UPDATE audit_alerts SET status = {p}, details = {p} WHERE id = {p}", (req.new_status, req.note, req.alert_id))
+    if isinstance(conn, sqlite3.Connection): conn.commit()
     conn.close()
     
     log_event(token_data.get("primary"), "PROCESS_ALERT", target=str(req.alert_id), result="SUCCESS", details=f"New Status: {req.new_status}")
@@ -143,8 +149,9 @@ async def get_audit_institutions(token_data: Dict = Depends(require_valid_token)
     if token_data.get("role") != "Régulateur (BCRG)":
         raise HTTPException(status_code=403, detail="Accès réservé")
     
+    from modules.common.database import get_db_connection
     conn = get_db_connection()
-    cursor = conn.cursor()
+    cursor = conn.cursor(dictionary=True) if not isinstance(conn, sqlite3.Connection) else conn.cursor()
     cursor.execute("SELECT * FROM institutions")
     insts = [dict(i) for i in cursor.fetchall()]
     conn.close()
@@ -154,19 +161,42 @@ async def get_audit_institutions(token_data: Dict = Depends(require_valid_token)
 
 def trigger_aml_check(tx_id: str, client_id: str, amount: float, details: str):
     """Analyse une transaction et lève une alerte si suspecte."""
+    from modules.common.database import get_db_connection, get_placeholder
     conn = get_db_connection()
+    if not conn: return
     cursor = conn.cursor()
+    p = get_placeholder()
     
     # Règle 1: Montant élevé (> 1,000,000 GNF)
     if amount >= 1000000:
-        cursor.execute("""
+        cursor.execute(f"""
             INSERT INTO audit_alerts (tx_id, client_id, type, severity, details)
-            VALUES (?, ?, 'LARGE_AMOUNT', 'HIGH', ?)
+            VALUES ({p}, {p}, 'LARGE_AMOUNT', 'HIGH', {p})
         """, (tx_id, client_id, f"Transaction de {amount} GNF détectée. Détails: {details}"))
+        if isinstance(conn, sqlite3.Connection): conn.commit()
         logger.warning(f"🚨 AML ALERT: Large amount detected for {client_id}: {amount}")
 
-    # Règle 2: Fréquence (Simulation)
-    # Dans un vrai système, on compterait les tx des 10 dernières minutes
-
-    conn.commit()
     conn.close()
+@router.get("/reports")
+async def get_audit_reports(token_data: Dict = Depends(require_valid_token)):
+    if token_data.get("role") != "Régulateur (BCRG)":
+        raise HTTPException(status_code=403, detail="Accès réservé")
+    
+    # On récupère les logs de type 'GENERATE_REPORT'
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True) if not isinstance(conn, sqlite3.Connection) else conn.cursor()
+    cursor.execute("SELECT * FROM audit_logs WHERE action = 'GENERATE_REPORT' ORDER BY timestamp DESC")
+    rows = cursor.fetchall()
+    conn.close()
+    
+    reports = []
+    for r in rows:
+        d = dict(r)
+        reports.append({
+            "id": f"REP-{d['id']}",
+            "name": d['details'] or "Rapport Système",
+            "date": d['timestamp'][:10],
+            "size": "1.2 MB", # Simulé car pas de stockage fichier réel
+            "type": "PDF"
+        })
+    return reports

@@ -7,23 +7,26 @@ const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 export default function RiskDashboard() {
   const { user, token } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [threshold, setThreshold] = useState(65);
-  const [saving, setSaving] = useState(false);
-  const [config, setConfig] = useState({
-    min_balance: 500000,
-    min_activity_score: 40,
-    high_risk_threshold: 30,
-    auto_approve_threshold: 80,
+  const [data, setData] = useState({
+    kpis: { avg_score: 0, high_risk_percent: 0, credits_active: 0, defaults: 0, total_exposure: 0 },
+    score_distribution: []
   });
+  const [alerts, setAlerts] = useState([]);
 
   useEffect(() => { if (token) fetchRiskData(); }, [token]);
 
   const fetchRiskData = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${API}/m1/risk/threshold`, { headers: { Authorization: `Bearer ${token}` } });
-      if (res.data?.threshold) setThreshold(res.data.threshold);
+      const headers = { Authorization: `Bearer ${token}` };
+      const [resOverview, resAlerts, resThreshold] = await Promise.all([
+        axios.get(`${API}/m1/risk/overview`, { headers }),
+        axios.get(`${API}/m1/risk/alerts`, { headers }),
+        axios.get(`${API}/m1/risk/threshold`, { headers })
+      ]);
+      setData(resOverview.data);
+      setAlerts(resAlerts.data);
+      if (resThreshold.data?.threshold) setThreshold(resThreshold.data.threshold);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   };
@@ -38,18 +41,13 @@ export default function RiskDashboard() {
   };
 
   const kpis = [
-    { label: "Score moyen portefeuille", val: `${threshold}/100`, icon: <BarChart3 size={20} />, color: "#2563EB", bg: "#EFF6FF" },
-    { label: "Clients à risque", val: "12", icon: <AlertTriangle size={20} />, color: "#DC2626", bg: "#FEF2F2" },
-    { label: "Auto-approuvés", val: "86%", icon: <CheckCircle2 size={20} />, color: "#059669", bg: "#F0FDF4" },
-    { label: "Alertes actives", val: "2", icon: <Shield size={20} />, color: "#DC2626", bg: "#FEF2F2" },
+    { label: "Score moyen portefeuille", val: `${data.kpis.avg_score}/100`, icon: <BarChart3 size={20} />, color: "#2563EB", bg: "#EFF6FF" },
+    { label: "Part à haut risque", val: `${data.kpis.high_risk_percent}%`, icon: <AlertTriangle size={20} />, color: "#DC2626", bg: "#FEF2F2" },
+    { label: "Crédits actifs", val: data.kpis.credits_active, icon: <CheckCircle2 size={20} />, color: "#059669", bg: "#F0FDF4" },
+    { label: "Alertes actives", val: alerts.length, icon: <Shield size={20} />, color: "#DC2626", bg: "#FEF2F2" },
   ];
 
-  const alerts = [
-    { type: "HIGH", msg: "Pic d'activité suspect sur 622***456", time: "14:20" },
-    { type: "MEDIUM", msg: "Solde consolidé faible : 664***012", time: "13:05" },
-  ];
-
-  const barData = [40, 25, 60, 85, 30, 45, 90, 75, 55, 65, 40, 30, 50, 70, 80];
+  const barData = data.score_distribution.map(d => d.count);
 
   if (loading) return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
@@ -120,14 +118,15 @@ export default function RiskDashboard() {
               <h3 className="risk-card-title">Alertes actives</h3>
               <div className="risk-alerts">
                 {alerts.map((a, i) => (
-                  <div key={i} className={`risk-alert ${a.type.toLowerCase()}`}>
-                    <div className={`risk-alert-dot ${a.type.toLowerCase()}`}></div>
+                  <div key={i} className={`risk-alert ${a.severity?.toLowerCase() || 'low'}`}>
+                    <div className={`risk-alert-dot ${a.severity?.toLowerCase() || 'low'}`}></div>
                     <div>
-                      <p className="risk-alert-msg">{a.msg}</p>
-                      <span className="risk-alert-meta">{a.time} • Priorité {a.type}</span>
+                      <p className="risk-alert-msg">{a.details}</p>
+                      <span className="risk-alert-meta">{new Date(a.created_at).toLocaleTimeString()} • {a.type}</span>
                     </div>
                   </div>
                 ))}
+                {alerts.length === 0 && <p style={{ textAlign: "center", padding: "1rem", color: "#94A3B8", fontSize: "0.8rem" }}>Aucune alerte active.</p>}
               </div>
 
               <h3 className="risk-card-title" style={{ marginTop: "2rem" }}>Distribution du risque</h3>

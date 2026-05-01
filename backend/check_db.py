@@ -8,21 +8,31 @@ if current_dir not in sys.path:
 
 from modules.common.database import get_db_connection
 
-def check_balances():
+def check_all():
     conn = get_db_connection()
     if not conn:
         print("❌ Connexion échouée")
         return
         
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM simulator_balances")
-    rows = cursor.fetchall()
     
-    print(f"--- {len(rows)} records in simulator_balances ---")
-    for row in rows:
-        print(row)
-        
+    # 1. Balances
+    cursor.execute("SELECT COUNT(*) FROM simulator_balances")
+    print(f"Simulator Balances: {cursor.fetchone()[0]}")
+    
+    # 2. Users
+    cursor.execute("SELECT COUNT(*) FROM users")
+    print(f"Users: {cursor.fetchone()[0]}")
+    
+    # 3. Institutions
+    cursor.execute("SELECT COUNT(*) FROM institutions")
+    print(f"Institutions: {cursor.fetchone()[0]}")
+    
+    # 4. Transactions
+    cursor.execute("SELECT COUNT(*) FROM transactions")
+    print(f"Transactions: {cursor.fetchone()[0]}")
+    
     conn.close()
 
 if __name__ == "__main__":
-    check_balances()
+    check_all()

@@ -202,7 +202,7 @@ export default function ClientDetailPage() {
                  </div>
               </div>
             </div>
-
+            
             {/* 2.5 HISTORIQUE DES TRANSACTIONS */}
             <div className="glass-card">
               <div className="card-header">
@@ -222,26 +222,27 @@ export default function ClientDetailPage() {
                        </tr>
                     </thead>
                     <tbody>
-                       {[
-                         { date: "30/04 14:20", desc: "Dépôt Agence Kaloum", amt: "+1 200 000", op: "ORANGE" },
-                         { date: "29/04 09:15", desc: "Paiement Commerçant", amt: "-450 000", op: "MTN" },
-                         { date: "28/04 18:40", desc: "Retrait Guichet", amt: "-200 000", op: "ORANGE" },
-                       ].map((t, i) => (
+                       {(data.transactions || []).slice(0, 5).map((t, i) => (
                          <tr key={i}>
-                            <td className="tx-date">{t.date}</td>
+                            <td className="tx-date">{new Date(t.date).toLocaleDateString()}</td>
                             <td>
                                <div className="tx-desc">
-                                  <div className={`tx-dot ${t.op.toLowerCase()}`} />
+                                  <div className={`tx-dot ${(t.op || 'orange').toLowerCase()}`} />
                                   <span>{t.desc}</span>
                                </div>
                             </td>
-                            <td className={`tx-amt ${t.amt.startsWith("+") ? 'plus' : 'minus'}`}>{t.amt} GNF</td>
+                            <td className={`tx-amt ${t.type === 'CREDIT' ? 'plus' : 'minus'}`}>
+                               {t.type === 'CREDIT' ? '+' : '-'} {t.amount.toLocaleString()} GNF
+                            </td>
                          </tr>
                        ))}
+                       {(!data.transactions || data.transactions.length === 0) && (
+                         <tr><td colSpan="3" style={{ textAlign: "center", padding: "2rem", color: "#94A3B8" }}>Aucune transaction trouvée.</td></tr>
+                       )}
                     </tbody>
                  </table>
               </div>
-              <button onClick={() => navigate(`/transactions/${data.client_id}`)} className="btn-view-all">
+              <button onClick={() => navigate(`/transactions?id=${data.client_id}`)} className="btn-view-all">
                 Voir toutes les transactions <ChevronRight size={16} />
               </button>
             </div>
@@ -250,26 +251,25 @@ export default function ClientDetailPage() {
             <div className="glass-card">
               <div className="card-header">
                  <h3 className="section-title">Analyse Financière</h3>
-                 <button onClick={() => navigate(`/analytics/${data.client_id}`)} className="btn-analytics"><TrendingUp size={14} /> Voir graphique</button>
+                 <button onClick={() => navigate(`/score/${data.client_id}`)} className="btn-analytics"><TrendingUp size={14} /> Voir graphique</button>
               </div>
               <div className="stats-grid">
                  {[
-                   { label: "Revenus mensuels", val: "4.8M GNF", icon: <TrendingUp size={18} />, color: "#10B981" },
-                   { label: "Dépenses", val: "2.1M GNF", icon: <Activity size={18} />, color: "#EF4444" },
-                   { label: "Solde moyen", val: "1.5M GNF", icon: <BarChart3 size={18} />, color: "#3B82F6" },
-                   { label: "Fréquence tx", val: "2.4 / jour", icon: <History size={18} />, color: "#6366F1" },
+                   { label: "Revenus mensuels", val: `${(data.consolidation.revenu_mensuel || 0).toLocaleString()} GNF`, icon: <TrendingUp size={18} />, color: "#10B981" },
+                   { label: "Dépenses", val: `${(data.consolidation.depense_mensuelle || 0).toLocaleString()} GNF`, icon: <Activity size={18} />, color: "#EF4444" },
+                   { label: "Solde moyen", val: `${(data.consolidation.total_balance / 3).toLocaleString()} GNF`, icon: <BarChart3 size={18} />, color: "#3B82F6" },
+                   { label: "Transactions", val: `${data.transactions?.length || 0} total`, icon: <History size={18} />, color: "#6366F1" },
                  ].map((stat, i) => (
                    <div key={i} className="stat-item">
                       <div className="stat-icon" style={{ color: stat.color }}>{stat.icon}</div>
                       <div>
                         <p className="stat-label">{stat.label}</p>
-                        <p className="stat-val">{stat.val}</p>
+                        <p className="stat-val" style={{ fontSize: "0.85rem" }}>{stat.val}</p>
                       </div>
                    </div>
                  ))}
               </div>
             </div>
-
           </div>
 
           {/* ── RIGHT COLUMN (DÉCISION) ── */}

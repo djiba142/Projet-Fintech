@@ -200,7 +200,7 @@ async def log_requests(request: Request, call_next):
 
 # Montage des modules
 app.include_router(m1_router, prefix="/m1", tags=["M1 - Aggregator"])
-app.include_router(audit_router, prefix="/m1/audit", tags=["BCRG - Audit & Supervision"])
+app.include_router(audit_router, prefix="/m3/audit", tags=["BCRG - Audit & Supervision"])
 app.include_router(risk_router, prefix="/m1/risk", tags=["Risk - Analyst Decision Engine"])
 app.include_router(m2_router, prefix="/m2", tags=["M2 - Simulators"])
 app.include_router(m3_router, prefix="/m3", tags=["M3 - Security & OTP"])
@@ -225,15 +225,23 @@ async def health():
 
 @app.get("/stats/public")
 async def public_stats():
-    # Simulation de données dynamiques basées sur l'heure/date
-    import random
-    day_seed = datetime.now().day
-    random.seed(day_seed)
+    from modules.common.database import get_db_connection
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT COUNT(*) FROM users")
+    u_count = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT COUNT(*) FROM transactions")
+    tx_count = cursor.fetchone()[0]
+    
+    conn.close()
+    
     return {
-        "total_users": 7450 + random.randint(10, 100),
-        "total_transactions": 258400 + random.randint(1000, 5000),
-        "active_partners": 18,
-        "availability": "99.98%"
+        "total_users": u_count,
+        "total_transactions": tx_count,
+        "active_partners": 3,
+        "availability": "99.99%"
     }
 
 # Service du Frontend React

@@ -16,7 +16,8 @@ import {
   Zap,
   Target,
   ArrowDownToLine,
-  Loader2
+  Loader2,
+  CheckCircle2
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import useTransactionsSocket from "../hooks/useTransactionsSocket";
@@ -40,6 +41,7 @@ export default function ClientDashboard() {
   const [filter, setFilter] = useState("7d");
   const [activeOp, setActiveOp] = useState("ALL");
   const [showWithdraw, setShowWithdraw] = useState(false);
+  const [successMsg, setSuccessMsg] = useState("");
 
   const liveTransactions = useTransactionsSocket(user?.username);
 
@@ -78,6 +80,8 @@ export default function ClientDashboard() {
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      setSuccessMsg(`Félicitations ! Un dépôt de 500 000 GNF a été crédité sur votre compte ${op}.`);
+      setTimeout(() => setSuccessMsg(""), 5000);
       // Le WebSocket déclenchera le refresh automatiquement grâce au useEffect
     } catch (err) {
       alert("Erreur simulation dépôt");
@@ -90,12 +94,12 @@ export default function ClientDashboard() {
 
   // Écouteur pour rafraîchissement automatique des soldes au succès d'une transaction live
   useEffect(() => {
-    const hasNewSuccess = liveTransactions.some(tx => tx.status === "SUCCESS");
-    if (hasNewSuccess) {
-      console.log("🔄 Transaction réussie détectée, rafraîchissement des soldes...");
+    const successCount = liveTransactions.filter(tx => tx.status === "SUCCESS").length;
+    if (successCount > 0) {
+      console.log(`🔄 ${successCount} transaction(s) réussie(s) détectée(s), rafraîchissement...`);
       fetchData();
     }
-  }, [liveTransactions]);
+  }, [liveTransactions.length]); // Déclenché uniquement quand le nombre de tx change
 
   if (loading) return (
     <div className="flex-center" style={{ minHeight: "40vh" }}>
@@ -115,6 +119,14 @@ export default function ClientDashboard() {
             {user?.fullname || "Client"}
           </h1>
         </div>
+
+        {successMsg && (
+          <div style={{ background: "#DCFCE7", border: "1.5px solid #10B981", borderRadius: 20, padding: "1.2rem", marginBottom: "2rem", display: "flex", alignItems: "center", gap: 12, animation: "slideIn 0.3s ease-out" }}>
+             <CheckCircle2 color="#10B981" size={24} />
+             <p style={{ margin: 0, color: "#065F46", fontWeight: 800, fontSize: "0.9rem" }}>{successMsg}</p>
+             <style>{`@keyframes slideIn { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }`}</style>
+          </div>
+        )}
 
         <div className="dashboard-grid">
            

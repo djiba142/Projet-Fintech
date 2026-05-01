@@ -62,11 +62,20 @@ const ReportCard = ({ title, description, icon, color, onGenerate }) => {
 export default function AuditReports() {
   const { token } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [history] = useState([
-    { id: "REP-2026-001", name: "Rapport Mensuel Avril 2026", date: "30/04/2026", size: "2.4 MB", type: "PDF" },
-    { id: "REP-2026-002", name: "Audit AML Hebdomadaire", date: "28/04/2026", size: "1.1 MB", type: "XLSX" },
-    { id: "REP-2026-003", name: "Monitoring Institutions T1", date: "25/04/2026", size: "4.8 MB", type: "PDF" }
-  ]);
+  const [history, setHistory] = useState([]);
+
+  const fetchReports = async () => {
+    try {
+      const res = await axios.get(`${API}/m3/audit/reports`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setHistory(res.data);
+    } catch (err) { console.error(err); }
+  };
+
+  useEffect(() => {
+    if (token) fetchReports();
+  }, [token]);
 
   return (
     <div style={{ padding: "2rem", background: "#F8FAFC", minHeight: "100vh" }}>

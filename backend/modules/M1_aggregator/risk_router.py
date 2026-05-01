@@ -61,35 +61,49 @@ async def get_risk_overview(token_data: Dict = Depends(require_valid_token)):
     if token_data.get("role") not in ["Analyste Risque", "Administrateur"]:
         raise HTTPException(status_code=403, detail="Accès réservé aux analystes")
 
+    from modules.common.database import get_db_connection, get_all_users, get_all_loan_dossiers
+    
     users = get_all_users()
     clients = [u for u in users if u['role'] == 'Client']
+    dossiers = get_all_loan_dossiers()
     
-    # Simulation des agrégats pour le dashboard
-    total_clients = len(clients)
+    total_exposure = sum(d['amount'] for d in dossiers if d['status'] == 'APPROVED')
+    defaults = len([d for d in dossiers if d['status'] == 'DEFAULT']) # Simulé par statut DEFAULT
+    
+    # Calcul réel des scores pour le dashboard (agrégat)
     high_risk_count = 0
     scores = []
     
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True) if not isinstance(conn, sqlite3.Connection) else conn.cursor()
+    
     for c in clients:
-        # On simule un score pour chaque client pour la démo
-        import random
-        s = random.randint(30, 95)
-        scores.append(s)
-        if s < 40: high_risk_count += 1
+        # On pourrait mettre en cache le score en base pour perf, ici on recalcule pour être "frais"
+        try:
+            # Récupération simplifiée du dernier score ou calcul
+            cursor.execute("SELECT score FROM loan_dossiers WHERE client_id = ? ORDER BY created_at DESC LIMIT 1", (c['username'],))
+            row = cursor.fetchone()
+            s = row['score'] if row else 72 # Default si pas de dossier
+            scores.append(s)
+            if s < 40: high_risk_count += 1
+        except: continue
 
-    avg_score = sum(scores) / total_clients if total_clients > 0 else 0
+    conn.close()
+    
+    avg_score = sum(scores) / len(scores) if scores else 0
     
     return {
         "kpis": {
             "avg_score": round(avg_score, 1),
-            "high_risk_percent": round((high_risk_count / total_clients * 100), 1) if total_clients > 0 else 0,
-            "credits_active": 42,
-            "defaults": 3,
-            "total_exposure": 1500000000
+            "high_risk_percent": round((high_risk_count / len(clients) * 100), 1) if clients else 0,
+            "credits_active": len([d for d in dossiers if d['status'] == 'APPROVED']),
+            "defaults": defaults,
+            "total_exposure": total_exposure
         },
         "score_distribution": [
             {"range": "0-40", "count": high_risk_count},
-            {"range": "40-70", "count": total_clients - high_risk_count - (total_clients // 2)},
-            {"range": "70-100", "count": total_clients // 2}
+            {"range": "40-70", "count": len([s for s in scores if 40 <= s < 70])},
+            {"range": "70-100", "count": len([s for s in scores if s >= 70])}
         ]
     }
 
@@ -101,13 +115,22 @@ async def get_risk_clients(token_data: Dict = Depends(require_valid_token)):
     users = get_all_users()
     clients = [u for u in users if u['role'] == 'Client']
     
-    for c in clients:
-        # Mocking score and risk for list view
-        import random
-        c['score'] = random.randint(35, 90)
-        c['risk_level'] = get_risk_level(c['score'])
-        c['credit_status'] = "NONE" if c['score'] < 50 else "ELIGIBLE"
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True) if not isinstance(conn, sqlite3.Connection) else conn.cursor()
     
+    for c in clients:
+        try:
+            cursor.execute("SELECT score FROM loan_dossiers WHERE client_id = ? ORDER BY created_at DESC LIMIT 1", (c['username'],))
+            row = cursor.fetchone()
+            c['score'] = row['score'] if row else 72
+            c['risk_level'] = get_risk_level(c['score'])
+            c['credit_status'] = "NONE" if c['score'] < 50 else "ELIGIBLE"
+        except:
+            c['score'] = 72
+            c['risk_level'] = "LOW"
+            c['credit_status'] = "ELIGIBLE"
+            
+    conn.close()
     return clients
 
 @router.get("/analysis/{username}")
@@ -156,8 +179,13 @@ async def get_client_analysis(username: str, token_data: Dict = Depends(require_
 
 @router.get("/alerts")
 async def get_risk_alerts(token_data: Dict = Depends(require_valid_token)):
-    # Simulation d'alertes de baisse de score
-    return [
-        {"id": 1, "client": "client1", "type": "SCORE_DROP", "old_score": 75, "new_score": 32, "date": datetime.now().isoformat()},
-        {"id": 2, "client": "djiba", "type": "SUSPICIOUS_WITHDRAWAL", "amount": 5000000, "date": datetime.now().isoformat()},
-    ]
+    if token_data.get("role") not in ["Analyste Risque", "Administrateur"]:
+        raise HTTPException(status_code=403, detail="Accès réservé")
+        
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True) if not isinstance(conn, sqlite3.Connection) else conn.cursor()
+    cursor.execute("SELECT * FROM audit_alerts WHERE status = 'OPEN' ORDER BY created_at DESC LIMIT 20")
+    rows = cursor.fetchall()
+    conn.close()
+    
+    return [dict(r) for r in rows]

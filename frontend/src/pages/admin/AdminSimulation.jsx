@@ -11,7 +11,9 @@ import {
   AlertTriangle,
   RefreshCw,
   PlusCircle,
-  Coins
+  Coins,
+  CheckCircle2,
+  X
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import axios from "axios";
@@ -30,6 +32,7 @@ export default function AdminSimulation() {
   const [loading, setLoading] = useState(false);
   const [selectedAcc, setSelectedAcc] = useState({ msisdn: "", operator: "ORANGE" });
   const [depositAmount, setDepositAmount] = useState(100000);
+  const [success, setSuccess] = useState(null); // { title, message }
 
   const fetchMocks = async () => {
     try {
@@ -49,7 +52,10 @@ export default function AdminSimulation() {
       await axios.post(`${API}/m3/admin/simulate/deposit`, { ...selectedAcc, amount: depositAmount }, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      alert(`Injection de ${depositAmount.toLocaleString()} GNF réussie sur ${selectedAcc.msisdn}`);
+      setSuccess({
+        title: "Injection Réussie",
+        message: `Le compte ${selectedAcc.msisdn} a été crédité. Votre solde administrateur a été réduit de ${depositAmount.toLocaleString()} GNF conformément à la politique de flux réels.`
+      });
     } catch (err) { alert("Erreur simulation"); }
     finally { setLoading(false); }
   };
@@ -60,7 +66,10 @@ export default function AdminSimulation() {
       await axios.post(`${API}/m3/admin/simulate/generate-activity`, { ...selectedAcc, count: 15 }, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      alert(`15 transactions historiques générées pour ${selectedAcc.msisdn}. Le score de crédit sera mis à jour.`);
+      setSuccess({
+        title: "Activité Générée",
+        message: `15 transactions historiques ont été ajoutées pour ${selectedAcc.msisdn}. Le score de crédit est maintenant calculable.`
+      });
     } catch (err) { alert("Erreur simulation"); }
     finally { setLoading(false); }
   };
@@ -77,6 +86,21 @@ export default function AdminSimulation() {
          </div>
          <p style={{ margin: 0, fontSize: "0.85rem", color: "#64748B", fontWeight: 600 }}>Préparez vos jeux de données de test sans clés d'API réelles</p>
       </header>
+
+      {/* ── SUCCESS MODAL ── */}
+      {success && (
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(15, 23, 42, 0.8)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+          <div style={{ background: "#fff", padding: "3rem", borderRadius: 40, width: "100%", maxWidth: 450, textAlign: "center", position: "relative", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)" }}>
+            <button onClick={() => setSuccess(null)} style={{ position: "absolute", top: 20, right: 20, background: "#F1F5F9", border: "none", width: 40, height: 40, borderRadius: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><X size={20} /></button>
+            <div style={{ width: 80, height: 80, background: "#DCFCE7", borderRadius: 24, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 1.5rem" }}>
+              <CheckCircle2 size={40} color="#10B981" />
+            </div>
+            <h2 style={{ fontSize: "1.8rem", fontWeight: 950, color: "#1E293B", margin: "0 0 10px" }}>{success.title}</h2>
+            <p style={{ color: "#64748B", fontWeight: 600, lineHeight: 1.6, marginBottom: "2rem" }}>{success.message}</p>
+            <button onClick={() => setSuccess(null)} style={{ width: "100%", padding: "14px", borderRadius: 16, background: "#006233", color: "#fff", border: "none", fontWeight: 800, cursor: "pointer" }}>Terminer</button>
+          </div>
+        </div>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2rem" }}>
          

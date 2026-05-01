@@ -323,7 +323,13 @@ async def get_transactions_internal(username: str):
     all_tx = []
     for res in results:
         if isinstance(res, list): all_tx.extend(res)
-    all_tx.sort(key=lambda x: x["date"], reverse=True)
+    
+    # Normalisation des dates pour le tri (Support MySQL datetime vs SQLite str)
+    for tx in all_tx:
+        if isinstance(tx["date"], datetime):
+            tx["date"] = tx["date"].isoformat()
+            
+    all_tx.sort(key=lambda x: x["date"] if x["date"] else "", reverse=True)
     return {"transactions": all_tx}
 
 @router.get("/transactions/{msisdn}")
@@ -681,7 +687,14 @@ async def get_user_analytics(username: str, token_data: Dict = Depends(require_v
     # 3. Ventiler les transactions
     for tx in transactions:
         try:
-            tx_date = datetime.fromisoformat(tx["date"]).date()
+            val = tx["date"]
+            if isinstance(val, str):
+                tx_date = datetime.fromisoformat(val).date()
+            elif isinstance(val, datetime):
+                tx_date = val.date()
+            else:
+                continue
+                
             if tx_date in days:
                 idx = days.index(tx_date)
                 if tx["type"] == "CREDIT":
@@ -842,13 +855,17 @@ async def verify_withdraw_otp(
     }
 
 @router.post("/withdraw/validate")
-async def validate_withdraw_agent(req: WithdrawValidateRequest):
+async def validate_withdraw_agent(req: WithdrawValidateRequest, token_data: Dict = Depends(require_valid_token)):
     """
     Endpoint utilisé par l'AGENT pour finaliser le retrait.
     """
     from modules.common.database import get_db_connection
     from modules.M2_simulators.router import execute_simulated_withdraw, WithdrawRequest
     
+    # Identifier le MSISDN de l'agent pour le crédit
+    agent_msisdn = token_data.get("msisdn_orange") if req.agent_id.startswith("ORANGE") else token_data.get("msisdn_mtn")
+    if not agent_msisdn: agent_msisdn = token_data.get("primary")
+
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -871,7 +888,7 @@ async def validate_withdraw_agent(req: WithdrawValidateRequest):
             conn.close()
             raise HTTPException(status_code=400, detail="Code de retrait expiré.")
 
-        # Action sur le simulateur (Débit réel)
+        # Action sur le simulateur (Débit réel client, Crédit agent)
         username = tx["client_id"]
         target_user = get_user_by_username(username)
         msisdn = target_user.get("msisdn_orange") if tx["operator"] == "ORANGE" else target_user.get("msisdn_mtn")
@@ -881,7 +898,8 @@ async def validate_withdraw_agent(req: WithdrawValidateRequest):
                 operator=tx["operator"],
                 msisdn=msisdn,
                 amount=int(tx["amount"]),
-                agent_id=req.agent_id
+                agent_id=req.agent_id,
+                agent_msisdn=agent_msisdn
             ))
             
             # Mise à jour finale en base
@@ -947,16 +965,23 @@ async def perform_deposit(
     """
     from modules.M2_simulators.router import execute_simulated_deposit, DepositRequest
     
+    # En mode simulation/sandbox, on permet à tous de tester le dépôt (Cash-in)
+    # L'agent ou l'envoyeur sera débité de toute façon.
     role = token_data.get("role")
-    if role not in ["Administrateur", "Agent de Crédit"]:
-        raise HTTPException(status_code=403, detail="Seuls les agents peuvent effectuer des dépôts.")
         
+    # Identifier le MSISDN de l'agent/admin pour le débit
+    agent_msisdn = token_data.get("msisdn_orange") if req.operator.upper() == "ORANGE" else token_data.get("msisdn_mtn")
+    if not agent_msisdn:
+        # Fallback sur le username si pas de MSISDN explicite (ex: admin pur)
+        agent_msisdn = token_data.get("primary")
+
     sim_req = DepositRequest(
         operator=req.operator,
         msisdn=req.msisdn,
         amount=req.amount,
         agent_id=req.agent_id,
-        client_id=req.client_id
+        client_id=req.client_id,
+        agent_msisdn=agent_msisdn
     )
     
     result = await execute_simulated_deposit(sim_req)
@@ -978,3 +1003,72 @@ async def perform_deposit(
     })
     
     return result
+
+# ─── ENDPOINTS INSTITUTIONNELS (AGENT/ADMIN) ───
+
+@router.get("/institutions/overview")
+async def get_institution_overview(token_data: Dict = Depends(require_valid_token)):
+    """Vue d'ensemble pour l'agent de crédit."""
+    from modules.common.database import get_db_connection, get_all_users, get_all_loan_dossiers
+    
+    users = get_all_users()
+    clients = [u for u in users if u['role'] == 'Client']
+    dossiers = get_all_loan_dossiers()
+    
+    pending = [d for d in dossiers if d['status'] == 'PENDING']
+    approved = [d for d in dossiers if d['status'] == 'APPROVED']
+    
+    avg_score = sum(d['score'] for d in dossiers) / len(dossiers) if dossiers else 72
+    
+    return {
+        "clients": clients,
+        "clients_count": len(clients),
+        "pending_count": len(pending),
+        "approved_count": len(approved),
+        "avg_score": round(avg_score, 1)
+    }
+
+@router.get("/institutions/dossiers")
+async def get_institution_dossiers(token_data: Dict = Depends(require_valid_token)):
+    """Liste tous les dossiers de crédit."""
+    from modules.common.database import get_all_loan_dossiers
+    return {"dossiers": get_all_loan_dossiers()}
+
+@router.get("/institutions/analytics")
+async def get_global_analytics(token_data: Dict = Depends(require_valid_token)):
+    """Analyses globales pour l'institution."""
+    from modules.common.database import get_db_connection
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True) if not isinstance(conn, sqlite3.Connection) else conn.cursor()
+    
+    # 7 derniers jours
+    from datetime import datetime, timedelta
+    today = datetime.now().date()
+    days = [(today - timedelta(days=i)) for i in range(6, -1, -1)]
+    labels = [d.strftime("%a") for d in days]
+    income = [0] * 7
+    expense = [0] * 7
+    
+    cursor.execute("SELECT created_at, amount, type FROM transactions WHERE created_at >= ?", (days[0],))
+    txs = cursor.fetchall()
+    conn.close()
+    
+    for tx in txs:
+        try:
+            dt = tx['created_at'] if isinstance(tx, dict) else tx[0]
+            if isinstance(dt, str): dt = datetime.fromisoformat(dt).date()
+            else: dt = dt.date()
+            
+            if dt in days:
+                idx = days.index(dt)
+                typ = tx['type'] if isinstance(tx, dict) else tx[2]
+                amt = tx['amount'] if isinstance(tx, dict) else tx[1]
+                if typ == 'CREDIT': income[idx] += amt
+                else: expense[idx] += amt
+        except: continue
+        
+    return {
+        "labels": labels,
+        "in": income,
+        "out": expense
+    }

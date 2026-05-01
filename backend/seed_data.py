@@ -21,9 +21,8 @@ def seed_kandjou():
     cursor = conn.cursor()
     p = get_placeholder()
     
-    # 1. Liste des utilisateurs à injecter (10 clients + admins)
+    # 1. Liste des utilisateurs à injecter
     users = [
-        # login, pass, role, fullname, email, orange, mtn, profile_type, language, status
         ("admin@kandjou.gn", "1234567890", "Administrateur", "Admin Kandjou", "admin@kandjou.gn", None, None, "Système", "FR", "active"),
         ("agent@kandjou.gn", "1234567890", "Agent de Crédit", "Mamadou Diallo", "mamadou@bkr.gn", None, None, "Institution", "FR", "active"),
         ("620000001", "1234567890", "Client", "Aboubacar Sylla", "abou@email.gn", "224620000001", "224664000001", "Multi-Opérateur (Premium)", "FR", "active"),
@@ -53,55 +52,51 @@ def seed_kandjou():
         except Exception as e:
             print(f"Erreur utilisateur {u[0]}: {e}")
 
-    # 2. Injection des soldes simulateur (Corrélation MSISDN <-> Soldes)
-    # On met 10 000 000 GNF sur chaque compte comme demandé par l'utilisateur
+    # 2. Injection des soldes simulateur
     balances = [
-        ("224620000001", "ORANGE", 10000000),
-        ("224664000001", "MTN", 10000000),
-        ("224620000002", "ORANGE", 10000000),
-        ("224664000002", "MTN", 10000000),
-        ("224620000003", "ORANGE", 10000000),
-        ("224620000004", "ORANGE", 10000000),
-        ("224664000004", "MTN", 10000000),
-        ("224620000005", "ORANGE", 10000000),
-        ("224664000005", "MTN", 10000000),
-        ("224620000006", "ORANGE", 10000000),
-        ("224620000007", "ORANGE", 10000000),
-        ("224664000007", "MTN", 10000000),
-        ("224620000008", "ORANGE", 10000000),
-        ("224620000009", "ORANGE", 10000000),
-        ("224664000009", "MTN", 10000000),
-        ("224620000010", "ORANGE", 10000000),
+        ("224620000001", "ORANGE", 10000000), ("224664000001", "MTN", 10000000),
+        ("224620000002", "ORANGE", 10000000), ("224664000002", "MTN", 10000000),
+        ("224620000003", "ORANGE", 10000000), ("224620000004", "ORANGE", 10000000),
+        ("224664000004", "MTN", 10000000), ("224620000005", "ORANGE", 10000000),
+        ("224664000005", "MTN", 10000000), ("224620000006", "ORANGE", 10000000),
+        ("224620000007", "ORANGE", 10000000), ("224664000007", "MTN", 10000000),
+        ("224620000008", "ORANGE", 10000000), ("224620000009", "ORANGE", 10000000),
+        ("224664000009", "MTN", 10000000), ("224620000010", "ORANGE", 10000000),
     ]
 
     print(f"--- Injection de {len(balances)} soldes simulateur ---")
-    # Détection du type de base pour ON CONFLICT vs ON DUPLICATE KEY
     import sqlite3
-    is_mysql = not hasattr(conn, 'row_factory')
+    is_mysql = not isinstance(conn, sqlite3.Connection)
     
     for msisdn, op, bal in balances:
         try:
             if is_mysql:
-                query = f"""
-                    INSERT INTO simulator_balances (msisdn, operator, balance, updated_at)
-                    VALUES ({p}, {p}, {bal}, CURRENT_TIMESTAMP)
-                    ON DUPLICATE KEY UPDATE balance = {bal}, updated_at = CURRENT_TIMESTAMP
-                """
-                cursor.execute(query, (msisdn, op))
+                query = f"INSERT INTO simulator_balances (msisdn, operator, balance, updated_at) VALUES ({p}, {p}, {bal}, CURRENT_TIMESTAMP) ON DUPLICATE KEY UPDATE balance = {bal}, updated_at = CURRENT_TIMESTAMP"
             else:
-                query = f"""
-                    INSERT INTO simulator_balances (msisdn, operator, balance, updated_at)
-                    VALUES ({p}, {p}, {bal}, CURRENT_TIMESTAMP)
-                    ON CONFLICT(msisdn) DO UPDATE SET balance = {bal}, updated_at = CURRENT_TIMESTAMP
-                """
-                cursor.execute(query, (msisdn, op))
+                query = f"INSERT INTO simulator_balances (msisdn, operator, balance, updated_at) VALUES ({p}, {p}, {bal}, CURRENT_TIMESTAMP) ON CONFLICT(msisdn) DO UPDATE SET balance = {bal}, updated_at = CURRENT_TIMESTAMP"
+            cursor.execute(query, (msisdn, op))
         except Exception as e:
             print(f"Erreur solde {msisdn}: {e}")
+
+    # 3. Injection des Institutions
+    institutions = [
+        ("Orange Money Guinea", "TELCO", "ONLINE", 99.8, 150000000),
+        ("MTN MoMo Guinea", "TELCO", "ONLINE", 99.5, 95000000),
+        ("Kandjou Finance", "MFI", "ONLINE", 100.0, 5000000)
+    ]
+    print(f"--- Injection de {len(institutions)} institutions ---")
+    for name, itype, status, uptime, vol in institutions:
+        try:
+            cursor.execute(f"SELECT id FROM institutions WHERE name = {p}", (name,))
+            if not cursor.fetchone():
+                cursor.execute(f"INSERT INTO institutions (name, type, api_status, uptime_score, total_volume) VALUES ({p}, {p}, {p}, {p}, {p})", (name, itype, status, uptime, vol))
+        except Exception as e:
+            print(f"Erreur institution {name}: {e}")
 
     if not is_mysql:
         conn.commit()
     conn.close()
-    print("Seeding termine avec succes pour MySQL et SQLite !")
+    print("Seeding terminé avec succès pour MySQL et SQLite !")
 
 if __name__ == "__main__":
     seed_kandjou()

@@ -48,12 +48,12 @@ export default function AuditPage() {
         axios.get(`${API}/m3/audit/overview`, { headers }),
         axios.get(`${API}/m3/audit/institutions`, { headers }),
         axios.get(`${API}/m3/audit/logs`, { headers }),
-        axios.get(`${API}/m1/institutions/overview`, { headers })
+        axios.get(`${API}/m3/audit/transactions`, { headers })
       ]);
       setData(ovRes.data);
       setInstitutions(instRes.data);
       setLogs(logRes.data);
-      setTransactions(txRes.data.clients || []);
+      setTransactions(txRes.data);
     } catch (err) {
       console.error("Erreur fetch audit", err);
     } finally {
@@ -210,21 +210,27 @@ export default function AuditPage() {
                       <th>Type</th>
                       <th>Montant</th>
                       <th>Horodatage</th>
-                      <th>Statut</th>
+                      <th>Risque</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {/* Mocked global list based on institutions data */}
-                    {transactions.map((tx, i) => (
+                    {(transactions || []).map((tx, i) => (
                       <tr key={i}>
-                        <td className="mono">TX-2024-{1000 + i}</td>
-                        <td className="bold">{tx.fullname}</td>
-                        <td>TRANSFERT MOBILE</td>
-                        <td className="bold">{(Math.random() * 5000000).toLocaleString()} GNF</td>
-                        <td className="mono">30/04/2024 14:{20+i}</td>
-                        <td><span className="pill success">CONFORME</span></td>
+                        <td className="mono">{tx.tx_id}</td>
+                        <td className="bold">{tx.client_id}</td>
+                        <td>{tx.type}</td>
+                        <td className="bold">{tx.amount.toLocaleString()} GNF</td>
+                        <td className="mono">{new Date(tx.created_at).toLocaleString()}</td>
+                        <td>
+                          <span className={`pill ${tx.risk_level === 'HIGH' ? 'error' : 'success'}`}>
+                            {tx.risk_level || 'LOW'}
+                          </span>
+                        </td>
                       </tr>
                     ))}
+                    {(!transactions || transactions.length === 0) && (
+                      <tr><td colSpan="6" style={{ textAlign: "center", padding: "3rem", color: "#94A3B8" }}>Aucune transaction suspecte dans le registre.</td></tr>
+                    )}
                   </tbody>
                 </table>
               </div>

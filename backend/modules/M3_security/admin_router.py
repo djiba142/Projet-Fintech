@@ -1,5 +1,7 @@
 import logging
 import random
+import sqlite3
+import uuid
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict
 from fastapi import APIRouter, HTTPException, Depends, Body
@@ -51,21 +53,41 @@ def check_admin(token_data: Dict):
     if token_data.get("role") != "Administrateur":
         raise HTTPException(status_code=403, detail="Accès réservé aux administrateurs")
 
-# ─── OVERVIEW ───
 @router.get("/overview")
 async def get_admin_overview(token_data: Dict = Depends(require_valid_token)):
     check_admin(token_data)
     users = get_all_users()
     conn = get_db_connection()
-    cursor = conn.cursor()
+    cursor = conn.cursor(dictionary=True) if not isinstance(conn, sqlite3.Connection) else conn.cursor()
+    
     try:
         cursor.execute("SELECT COUNT(*) as count FROM transactions")
-        total_tx = cursor.fetchone()['count']
+        row = cursor.fetchone()
+        total_tx = row['count'] if isinstance(row, dict) else row[0]
     except Exception: total_tx = 0
+    
+    # Calcul croissance réelle des utilisateurs
     try:
-        cursor.execute("SELECT COUNT(*) as count FROM audit_logs")
-        total_logs = cursor.fetchone()['count']
-    except Exception: total_logs = 0
+        cursor.execute("SELECT strftime('%m', created_at) as month, COUNT(*) as count FROM users GROUP BY month")
+        growth_raw = cursor.fetchall()
+        # Mapping mois index -> nom
+        months = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sep", "Oct", "Nov", "Déc"]
+        user_growth = []
+        for g in growth_raw:
+            m_idx = int(g['month'] if isinstance(g, dict) else g[0]) - 1
+            user_growth.append({"month": months[m_idx], "count": g['count'] if isinstance(g, dict) else g[1]})
+        if not user_growth:
+            user_growth = [{"month": "Mai", "count": len(users)}]
+    except Exception:
+        user_growth = [{"month": "Mai", "count": len(users)}]
+    
+    # Alertes récentes pour l'admin
+    try:
+        cursor.execute("SELECT * FROM audit_alerts WHERE status = 'OPEN' ORDER BY created_at DESC LIMIT 3")
+        recent_alerts = [dict(a) for a in cursor.fetchall()]
+    except Exception:
+        recent_alerts = []
+
     conn.close()
     
     try:
@@ -83,8 +105,9 @@ async def get_admin_overview(token_data: Dict = Depends(require_valid_token)):
             "system_health": "OPTIMAL",
             "uptime": "99.98%"
         },
-        "system": { "cpu": cpu, "ram": ram, "latency": "42ms" },
-        "user_growth": [{"month": "Jan", "count": 45}, {"month": "Mai", "count": len(users)}]
+        "system": { "cpu": cpu, "ram": ram, "latency": "24ms" },
+        "user_growth": user_growth,
+        "recent_alerts": recent_alerts
     }
 
 # ─── UTILISATEURS ───
@@ -116,64 +139,64 @@ async def get_mock_accounts(token_data: Dict = Depends(require_valid_token)):
 
 @router.post("/simulate/deposit")
 async def simulate_deposit(req: SimulateDepositRequest, token_data: Dict = Depends(require_valid_token)):
-    """Injecte des fonds simulés dans un compte Orange/MTN."""
+    """Injecte des fonds réels dans un compte Orange/MTN simulé via la DB."""
     check_admin(token_data)
-    from modules.M2_simulators.mock_data import ORANGE_ACCOUNTS, MTN_ACCOUNTS, ORANGE_TRANSACTIONS, MTN_TRANSACTIONS
+    from modules.M2_simulators.router import persist_transaction
+    from modules.common.database import get_sim_balance, update_sim_balance
     
-    if req.operator.upper() == "ORANGE":
-        if req.msisdn not in ORANGE_ACCOUNTS: raise HTTPException(404, "Compte Orange non trouvé")
-        ORANGE_ACCOUNTS[req.msisdn]["available_balance"] += req.amount
-        tx_list = ORANGE_TRANSACTIONS
-    else:
-        if req.msisdn not in MTN_ACCOUNTS: raise HTTPException(404, "Compte MTN non trouvé")
-        MTN_ACCOUNTS[req.msisdn]["current_balance"] += req.amount
-        tx_list = MTN_TRANSACTIONS
-
-    # Tracer la transaction
-    new_tx = {
-        "id": f"SIM-DEP-{random.randint(1000,9999)}",
-        "date": datetime.now().isoformat(),
-        "desc": f"Dépôt Simulation Admin",
-        "type": "CREDIT",
-        "amount": req.amount,
-        "status": "SUCCESS"
-    }
-    if req.msisdn not in tx_list: tx_list[req.msisdn] = []
-    tx_list[req.msisdn].insert(0, new_tx)
+    # 1. CRÉDIT CLIENT
+    current = get_sim_balance(req.msisdn) or 0
+    new_bal = current + req.amount
+    update_sim_balance(req.msisdn, req.operator.upper(), new_bal)
     
-    log_event("admin", "SIMULATE_DEPOSIT", req.msisdn, "SUCCESS", f"Dépôt de {req.amount} GNF")
-    return {"status": "success", "new_balance": ORANGE_ACCOUNTS[req.msisdn]["available_balance"] if req.operator == "ORANGE" else MTN_ACCOUNTS[req.msisdn]["current_balance"]}
+    # 2. DÉBIT ADMIN (Réalisme demandé)
+    admin_msisdn = token_data.get("msisdn_orange") if req.operator.upper() == "ORANGE" else token_data.get("msisdn_mtn")
+    if not admin_msisdn: admin_msisdn = token_data.get("primary")
+    
+    admin_bal = get_sim_balance(admin_msisdn) or 0
+    update_sim_balance(admin_msisdn, req.operator.upper(), admin_bal - req.amount)
+    
+    tx_id = f"SIM-DEP-{uuid.uuid4().hex[:6].upper()}"
+    persist_transaction(
+        tx_id=tx_id,
+        client_id=req.msisdn,
+        operator=req.operator.upper(),
+        tx_type="DEPOSIT",
+        amount=req.amount,
+        fee=0,
+        receiver=req.msisdn,
+        description="Dépôt Simulation Admin",
+        status="SUCCESS"
+    )
+    
+    log_event("admin", "SIMULATE_DEPOSIT", req.msisdn, "SUCCESS", f"Dépôt de {req.amount} GNF (Admin débié)")
+    return {"status": "success", "new_balance": new_bal, "admin_new_balance": admin_bal - req.amount}
 
 @router.post("/simulate/generate-activity")
 async def simulate_activity(req: SimulateActivityRequest, token_data: Dict = Depends(require_valid_token)):
-    """Génère un historique de transactions pour un MSISDN (utile pour le scoring)."""
+    """Génère un historique de transactions réel dans la DB pour un MSISDN."""
     check_admin(token_data)
-    from modules.M2_simulators.mock_data import ORANGE_ACCOUNTS, MTN_ACCOUNTS, ORANGE_TRANSACTIONS, MTN_TRANSACTIONS
+    from modules.M2_simulators.router import persist_transaction
     
-    is_orange = req.operator.upper() == "ORANGE"
-    tx_list = ORANGE_TRANSACTIONS if is_orange else MTN_TRANSACTIONS
-    if req.msisdn not in (ORANGE_ACCOUNTS if is_orange else MTN_ACCOUNTS):
-        raise HTTPException(404, f"Compte {req.operator} non trouvé")
-
-    if req.msisdn not in tx_list: tx_list[req.msisdn] = []
-    
-    types = ["CREDIT", "DEBIT", "DEBIT"] # Plus de débits pour le réalisme
+    types = ["CREDIT", "DEBIT", "DEBIT"]
     descs = ["Paiement Facture", "Achat Crédit", "Transfert reçu", "Dépôt Agent", "Paiement Marchand"]
     
-    for i in range(req.count):
+    for _ in range(req.count):
         t = random.choice(types)
         amt = random.randint(10000, 500000)
-        new_tx = {
-            "id": f"SIM-ACT-{random.randint(10000,99999)}",
-            "date": (datetime.now() - timedelta(days=random.randint(1, 60))).isoformat(),
-            "desc": random.choice(descs),
-            "type": t,
-            "amount": amt,
-            "status": "SUCCESS"
-        }
-        tx_list[req.msisdn].append(new_tx)
+        tx_id = f"SIM-ACT-{uuid.uuid4().hex[:8].upper()}"
+        persist_transaction(
+            tx_id=tx_id,
+            client_id=req.msisdn,
+            operator=req.operator.upper(),
+            tx_type=t,
+            amount=amt,
+            fee=0,
+            receiver="Destinataire Simulé",
+            description=random.choice(descs),
+            status="SUCCESS"
+        )
     
-    tx_list[req.msisdn].sort(key=lambda x: x["date"], reverse=True)
     return {"status": "success", "generated": req.count}
 
 # ─── RESTE (LOGS, CONFIG, ROLES) ───
@@ -191,16 +214,31 @@ async def get_admin_config(token_data: Dict = Depends(require_valid_token)):
 @router.get("/institutions")
 async def get_admin_institutions(token_data: Dict = Depends(require_valid_token)):
     check_admin(token_data)
-    # ... mock simplified for readability ...
-    return [{"id": "orange", "name": "Orange Money", "status": "ACTIVE", "uptime": "99.9%", "latency": "120ms", "success_rate": "99.8%"}]
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True) if not isinstance(conn, sqlite3.Connection) else conn.cursor()
+    cursor.execute("SELECT * FROM institutions")
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
 
 @router.get("/transactions")
 async def get_admin_all_transactions(token_data: Dict = Depends(require_valid_token)):
     check_admin(token_data)
     conn = get_db_connection()
-    cursor = conn.cursor()
+    cursor = conn.cursor(dictionary=True) if not isinstance(conn, sqlite3.Connection) else conn.cursor()
     cursor.execute("SELECT * FROM transactions ORDER BY created_at DESC LIMIT 200")
-    txs = [dict(r) for r in cursor.fetchall()]
+    rows = cursor.fetchall()
+    txs = []
+    for r in rows:
+        d = dict(r)
+        txs.append({
+            "tx_id": d.get("tx_id"),
+            "username": d.get("client_id"),
+            "type": d.get("type"),
+            "amount": d.get("amount"),
+            "status": d.get("status"),
+            "date": d.get("created_at")
+        })
     conn.close()
     return txs
 

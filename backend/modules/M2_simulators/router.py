@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import uuid
+import sqlite3
 from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel
@@ -69,7 +70,7 @@ FEE_SCHEDULE = {
     "TRANSFER_SAME_OPERATOR": 0.005,   # 0.5% — Orange→Orange ou MTN→MTN
     "TRANSFER_INTEROP":       0.010,   # 1.0% — Orange→MTN ou MTN→Orange
     "WITHDRAWAL":             0.010,   # 1.0% — Retrait chez agent
-    "DEPOSIT":                0.005,   # 0.5% — Dépôt (Frais de traitement)
+    "DEPOSIT":                0,       # Dépôt (Cash-in) gratuit pour le client
 }
 
 FEE_MIN = 500   # Frais minimum en GNF
@@ -117,22 +118,28 @@ def is_interop(from_operator: str, to_msisdn: str) -> bool:
 def persist_transaction(tx_id: str, client_id: str, operator: str, tx_type: str,
                          amount: int, fee: int, receiver: str, description: str,
                          status: str = "SUCCESS"):
-    """Enregistre chaque transaction dans la base SQLite de façon fiable."""
+    """Enregistre chaque transaction dans la base de façon fiable (MySQL ou SQLite)."""
     try:
-        from modules.common.database import get_db_connection
+        from modules.common.database import get_db_connection, get_placeholder
         conn = get_db_connection()
-        if not conn:
-            logger.warning("⚠️ DB non disponible — transaction non persistée")
-            return
+        if not conn: return
+        
         cursor = conn.cursor()
-        cursor.execute("""
-            INSERT OR IGNORE INTO transactions
-              (tx_id, client_id, operator, type, amount, receiver, description, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (tx_id, client_id, operator, tx_type, amount, receiver, description, status))
-        conn.commit()
+        p = get_placeholder()
+        is_mysql = not isinstance(conn, sqlite3.Connection)
+        
+        # MySQL: INSERT IGNORE | SQLite: INSERT OR IGNORE
+        verb = "INSERT IGNORE" if is_mysql else "INSERT OR IGNORE"
+        
+        query = f"""
+            {verb} INTO transactions
+              (tx_id, client_id, operator, type, amount, fee, receiver, description, status)
+            VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p})
+        """
+        cursor.execute(query, (tx_id, client_id, operator, tx_type, amount, fee, receiver, description, status))
+        if not is_mysql: conn.commit()
         conn.close()
-        logger.info(f"✅ Transaction {tx_id} persistée en DB (type={tx_type}, fee={fee} GNF)")
+        logger.info(f"✅ Transaction {tx_id} persistée en DB (type={tx_type})")
     except Exception as e:
         logger.error(f"❌ Erreur persistence DB: {e}")
 
@@ -396,6 +403,7 @@ class WithdrawRequest(BaseModel):
     amount: int
     agent_id: str
     client_id: Optional[str] = None
+    agent_msisdn: Optional[str] = None
 
 @router.post("/provider/withdraw")
 async def execute_simulated_withdraw(req: WithdrawRequest):
@@ -419,6 +427,7 @@ async def execute_simulated_withdraw(req: WithdrawRequest):
     total_deducted = amount + fee
 
     if op == "ORANGE":
+        # 1. DÉBIT CLIENT
         acc = ORANGE_ACCOUNTS.get(msisdn)
         if not acc:
             raise HTTPException(status_code=404, detail="Abonné Orange introuvable")
@@ -429,8 +438,27 @@ async def execute_simulated_withdraw(req: WithdrawRequest):
         update_sim_balance(msisdn, "ORANGE", acc["available_balance"])
         tx_list = ORANGE_TRANSACTIONS
         new_balance = acc["available_balance"]
+        
+        # 2. CRÉDIT AGENT
+        if req.agent_msisdn:
+            agent_acc = ORANGE_ACCOUNTS.get(req.agent_msisdn)
+            if agent_acc:
+                agent_acc["available_balance"] += amount
+                update_sim_balance(req.agent_msisdn, "ORANGE", agent_acc["available_balance"])
+                agent_tx = {
+                    "id": f"CR-AG-{uuid.uuid4().hex[:6].upper()}",
+                    "date": now,
+                    "desc": f"Crédit Retrait pour {msisdn}",
+                    "type": "CREDIT",
+                    "amount": amount,
+                    "fee": 0,
+                    "status": "SUCCESS"
+                }
+                if req.agent_msisdn not in ORANGE_TRANSACTIONS: ORANGE_TRANSACTIONS[req.agent_msisdn] = []
+                ORANGE_TRANSACTIONS[req.agent_msisdn].insert(0, agent_tx)
 
     elif op == "MTN":
+        # 1. DÉBIT CLIENT
         acc = MTN_ACCOUNTS.get(msisdn)
         if not acc:
             raise HTTPException(status_code=404, detail="Abonné MTN introuvable")
@@ -441,6 +469,24 @@ async def execute_simulated_withdraw(req: WithdrawRequest):
         update_sim_balance(msisdn, "MTN", acc["current_balance"])
         tx_list = MTN_TRANSACTIONS
         new_balance = acc["current_balance"]
+        
+        # 2. CRÉDIT AGENT
+        if req.agent_msisdn:
+            agent_acc = MTN_ACCOUNTS.get(req.agent_msisdn)
+            if agent_acc:
+                agent_acc["current_balance"] += amount
+                update_sim_balance(req.agent_msisdn, "MTN", agent_acc["current_balance"])
+                agent_tx = {
+                    "id": f"CR-AG-{uuid.uuid4().hex[:6].upper()}",
+                    "date": now,
+                    "desc": f"Crédit Retrait pour {msisdn}",
+                    "type": "CREDIT",
+                    "amount": amount,
+                    "fee": 0,
+                    "status": "SUCCESS"
+                }
+                if req.agent_msisdn not in MTN_TRANSACTIONS: MTN_TRANSACTIONS[req.agent_msisdn] = []
+                MTN_TRANSACTIONS[req.agent_msisdn].insert(0, agent_tx)
     else:
         raise HTTPException(status_code=400, detail="Opérateur non supporté")
 
@@ -494,6 +540,7 @@ class DepositRequest(BaseModel):
     amount: int
     agent_id: str
     client_id: Optional[str] = None
+    agent_msisdn: Optional[str] = None
 
 @router.post("/provider/deposit")
 async def execute_simulated_deposit(req: DepositRequest):
@@ -510,24 +557,60 @@ async def execute_simulated_deposit(req: DepositRequest):
     now = datetime.now().isoformat()
 
     if op == "ORANGE":
+        # 1. CRÉDIT CLIENT
         acc = ORANGE_ACCOUNTS.get(msisdn)
         if not acc:
             raise HTTPException(status_code=404, detail="Abonné Orange introuvable")
-        fee = compute_fee(amount, "DEPOSIT")
-        acc["available_balance"] += (amount - fee)
+        acc["available_balance"] += amount
         update_sim_balance(msisdn, "ORANGE", acc["available_balance"])
         tx_list = ORANGE_TRANSACTIONS
         new_balance = acc["available_balance"]
+        
+        # 2. DÉBIT AGENT (Si MSISDN fourni)
+        if req.agent_msisdn:
+            agent_acc = ORANGE_ACCOUNTS.get(req.agent_msisdn)
+            if agent_acc:
+                agent_acc["available_balance"] -= amount
+                update_sim_balance(req.agent_msisdn, "ORANGE", agent_acc["available_balance"])
+                agent_tx = {
+                    "id": f"DB-AG-{uuid.uuid4().hex[:6].upper()}",
+                    "date": now,
+                    "desc": f"Débit Dépôt pour {msisdn}",
+                    "type": "DEBIT",
+                    "amount": amount,
+                    "fee": 0,
+                    "status": "SUCCESS"
+                }
+                if req.agent_msisdn not in ORANGE_TRANSACTIONS: ORANGE_TRANSACTIONS[req.agent_msisdn] = []
+                ORANGE_TRANSACTIONS[req.agent_msisdn].insert(0, agent_tx)
 
     elif op == "MTN":
+        # 1. CRÉDIT CLIENT
         acc = MTN_ACCOUNTS.get(msisdn)
         if not acc:
             raise HTTPException(status_code=404, detail="Abonné MTN introuvable")
-        fee = compute_fee(amount, "DEPOSIT")
-        acc["current_balance"] += (amount - fee)
+        acc["current_balance"] += amount
         update_sim_balance(msisdn, "MTN", acc["current_balance"])
         tx_list = MTN_TRANSACTIONS
         new_balance = acc["current_balance"]
+        
+        # 2. DÉBIT AGENT (Si MSISDN fourni)
+        if req.agent_msisdn:
+            agent_acc = MTN_ACCOUNTS.get(req.agent_msisdn)
+            if agent_acc:
+                agent_acc["current_balance"] -= amount
+                update_sim_balance(req.agent_msisdn, "MTN", agent_acc["current_balance"])
+                agent_tx = {
+                    "id": f"DB-AG-{uuid.uuid4().hex[:6].upper()}",
+                    "date": now,
+                    "desc": f"Débit Dépôt pour {msisdn}",
+                    "type": "DEBIT",
+                    "amount": amount,
+                    "fee": 0,
+                    "status": "SUCCESS"
+                }
+                if req.agent_msisdn not in MTN_TRANSACTIONS: MTN_TRANSACTIONS[req.agent_msisdn] = []
+                MTN_TRANSACTIONS[req.agent_msisdn].insert(0, agent_tx)
     else:
         raise HTTPException(status_code=400, detail="Opérateur non supporté")
 
@@ -551,10 +634,10 @@ async def execute_simulated_deposit(req: DepositRequest):
         client_id=req.client_id or msisdn,
         operator=op,
         tx_type="DEPOSIT",
-        amount=amount - fee,
-        fee=fee,
+        amount=amount,
+        fee=0,
         receiver=msisdn,
-        description=f"Dépôt Cash-in via Agent #{req.agent_id} | Frais: {fee:,} GNF",
+        description=f"Dépôt Cash-in via Agent #{req.agent_id} | Gratuit",
         status="SUCCESS"
     )
 

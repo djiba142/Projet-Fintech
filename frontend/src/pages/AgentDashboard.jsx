@@ -59,14 +59,16 @@ export default function AgentDashboard() {
     setError(null);
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      const [resOverview, resDossiers] = await Promise.all([
+      const [resOverview, resDossiers, resAnalytics] = await Promise.all([
         axios.get(`${API}/m1/institutions/overview`, { headers }),
-        axios.get(`${API}/m1/institutions/dossiers`, { headers })
+        axios.get(`${API}/m1/institutions/dossiers`, { headers }),
+        axios.get(`${API}/m1/institutions/analytics`, { headers })
       ]);
       setData({
         ...resOverview.data,
         dossiers: resDossiers.data.dossiers || []
       });
+      setAnalytics(resAnalytics.data);
     } catch (err) {
       console.error("Erreur fetch overview", err);
       setError("Échec de la synchronisation des données.");

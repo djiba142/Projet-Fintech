@@ -84,16 +84,13 @@ export default function AdminDashboard() {
     </div>
   );
 
-  const chartData = [
-    { name: 'Lun', val: 400 }, { name: 'Mar', val: 700 }, { name: 'Mer', val: 600 },
-    { name: 'Jeu', val: 900 }, { name: 'Ven', val: 800 }, { name: 'Sam', val: 500 }, { name: 'Dim', val: 300 },
-  ];
+  const chartData = (data?.user_growth || []).map(g => ({ name: g.month, val: g.count }));
 
   const kpis = [
-    { label: "Utilisateurs", value: data?.stats?.total_users || 0, trend: "+12%", icon: <Users size={20} />, color: "#2563EB" },
-    { label: "Transactions", value: "14,502", trend: "+5%", icon: <Activity size={20} />, color: "#059669" },
-    { label: "Volume Total", value: "2.4B GNF", trend: "-2%", icon: <Zap size={20} />, color: "#7C3AED" },
-    { label: "Agents Actifs", value: data?.stats?.agents_count || 0, trend: "Stable", icon: <Globe size={20} />, color: "#EA580C" },
+    { label: "Utilisateurs", value: data?.kpis?.total_users || 0, trend: "+12%", icon: <Users size={20} />, color: "#2563EB" },
+    { label: "Transactions", value: data?.kpis?.tx_total || 0, trend: "+5%", icon: <Activity size={20} />, color: "#059669" },
+    { label: "Volume Total", value: "2.4B GNF", trend: "Est.", icon: <Zap size={20} />, color: "#7C3AED" },
+    { label: "Système", value: data?.kpis?.system_health || "UP", trend: "Stable", icon: <Globe size={20} />, color: "#EA580C" },
   ];
 
   return (
