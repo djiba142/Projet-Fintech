@@ -12,12 +12,22 @@ import {
   Loader2,
   Settings,
   RefreshCw,
-  X
+  X,
+  ShieldCheck,
+  Server,
+  Database
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import axios from "axios";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
+
+const LOGOS = {
+  "Orange Money": "/orange.png",
+  "MTN MoMo": "/mtn.png",
+  "Vista Bank": "https://img.icons8.com/color/96/bank.png", // Mock fallback for Vista
+  "Ecobank": "https://img.icons8.com/color/96/bank.png"    // Mock fallback for Ecobank
+};
 
 const S = {
   miniStat: { background: "#F8FAFC", padding: "1rem", borderRadius: 16, border: "1px solid #F1F5F9" },
@@ -58,7 +68,7 @@ export default function AdminInstitutions() {
 
   const handleAdd = (e) => {
     e.preventDefault();
-    alert(`Nouvelle institution "${form.name}" enregistrée avec succès.`);
+    alert(`L'institution "${form.name}" a été intégrée avec succès au réseau Kandjou.`);
     setShowModal(false);
     setForm({ name: "", type: "BANK", endpoint: "", apiKey: "" });
     fetchInst();
@@ -88,59 +98,91 @@ export default function AdminInstitutions() {
         </div>
       </header>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "2rem" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(350px, 1fr))", gap: "2rem" }}>
          {loading ? (
             <div style={{ padding: "4rem", textAlign: "center", color: "#94A3B8", fontWeight: 800 }}>Vérification de l'état des passerelles...</div>
          ) : institutions.map((inst, i) => (
            <div key={i} style={{ background: "#fff", borderRadius: 28, padding: "2rem", border: "1px solid #E2E8F0", boxShadow: "0 10px 30px rgba(0,0,0,0.02)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: "1.5rem" }}>
                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <div style={{ width: 44, height: 44, borderRadius: 14, background: "#F1F5F9", display: "flex", alignItems: "center", justifyContent: "center", color: "#1E293B" }}>
-                       <Building2 size={22} />
+                    <div style={{ width: 56, height: 56, borderRadius: 16, background: "#F1F5F9", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", border: "1px solid #E2E8F0" }}>
+                       {LOGOS[inst.name] ? (
+                         <img src={LOGOS[inst.name]} alt={inst.name} style={{ width: "70%", height: "70%", objectFit: "contain" }} />
+                       ) : (
+                         <Building2 size={24} color="#1E293B" />
+                       )}
                     </div>
                     <div>
                        <h3 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 900, color: "#1E293B" }}>{inst.name}</h3>
                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                          <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#10B981" }} />
-                          <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "#10B981" }}>{inst.status}</span>
+                          <div style={{ width: 8, height: 8, borderRadius: "50%", background: inst.status === 'ONLINE' || inst.status === 'ACTIVE' ? '#10B981' : '#F59E0B' }} />
+                          <span style={{ fontSize: "0.75rem", fontWeight: 800, color: inst.status === 'ONLINE' || inst.status === 'ACTIVE' ? '#10B981' : '#F59E0B' }}>{inst.status}</span>
                        </div>
                     </div>
                  </div>
-                 <button 
-                    onClick={() => alert(`Accès au monitoring externe de ${inst.name}...`)}
-                    style={{ background: "none", border: "none", color: "#3B82F6", cursor: "pointer" }}
-                  >
-                    <ExternalLink size={18} />
-                  </button>
+                 <div style={{ display: "flex", gap: 8 }}>
+                    <button 
+                      onClick={() => alert(`Accès aux logs techniques de ${inst.name}`)}
+                      style={{ width: 36, height: 36, borderRadius: 10, background: "#F8FAFC", border: "1px solid #E2E8F0", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748B", cursor: "pointer" }}
+                    >
+                       <Activity size={16} />
+                    </button>
+                    <button 
+                      onClick={() => alert(`Accès au monitoring externe de ${inst.name}...`)}
+                      style={{ width: 36, height: 36, borderRadius: 10, background: "#F8FAFC", border: "1px solid #E2E8F0", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748B", cursor: "pointer" }}
+                    >
+                      <ExternalLink size={16} />
+                    </button>
+                 </div>
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1.5rem" }}>
                  <div style={S.miniStat}>
-                    <p style={S.statLab}>Uptime</p>
+                    <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 5 }}>
+                       <Globe size={12} color="#94A3B8" />
+                       <p style={S.statLab}>Uptime</p>
+                    </div>
                     <p style={S.statVal}>{inst.uptime}</p>
                  </div>
                  <div style={S.miniStat}>
-                    <p style={S.statLab}>Latence</p>
+                    <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 5 }}>
+                       <Zap size={12} color="#94A3B8" />
+                       <p style={S.statLab}>Latence</p>
+                    </div>
                     <p style={S.statVal}>{inst.latency}</p>
                  </div>
                  <div style={{ ...S.miniStat, gridColumn: "span 2" }}>
-                    <p style={S.statLab}>Taux de succès API</p>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                       <div style={{ flex: 1, height: 6, background: "#F1F5F9", borderRadius: 10, overflow: "hidden" }}>
-                          <div style={{ width: inst.success_rate, height: "100%", background: "#10B981" }} />
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                       <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                          <ShieldCheck size={14} color="#10B981" />
+                          <p style={S.statLab}>Taux de succès API</p>
                        </div>
                        <span style={S.statVal}>{inst.success_rate}</span>
                     </div>
+                    <div style={{ width: "100%", height: 8, background: "#F1F5F9", borderRadius: 10, overflow: "hidden" }}>
+                       <div style={{ width: inst.success_rate, height: "100%", background: "#10B981", transition: "width 0.5s ease-out" }} />
+                    </div>
+                 </div>
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.5rem" }}>
+                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <Server size={14} color="#94A3B8" />
+                    <span style={{ fontSize: "0.7rem", fontWeight: 700, color: "#94A3B8" }}>Dernier Sync: {new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+                 </div>
+                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <Database size={14} color="#94A3B8" />
+                    <span style={{ fontSize: "0.7rem", fontWeight: 700, color: "#94A3B8" }}>Certifié BCRG</span>
                  </div>
               </div>
 
               <button 
                 onClick={() => alert(`Configuration technique pour ${inst.name} activée.`)}
-                style={{ width: "100%", padding: "12px", borderRadius: 14, border: "1.5px solid #F1F5F9", background: "#fff", color: "#1E293B", fontSize: "0.8rem", fontWeight: 900, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, transition: "0.2s" }}
+                style={{ width: "100%", padding: "12px", borderRadius: 14, border: "1.5px solid #F1F5F9", background: "#fff", color: "#1E293B", fontSize: "0.85rem", fontWeight: 900, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, transition: "0.2s" }}
                 onMouseOver={e => e.currentTarget.style.background = "#F8FAFC"}
                 onMouseOut={e => e.currentTarget.style.background = "#fff"}
               >
-                 <Settings size={16} /> Configurer l'API
+                 <Settings size={18} /> Configurer l'API
               </button>
            </div>
          ))}
