@@ -1,228 +1,197 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
-import { useLanguage } from "../context/LanguageContext";
-import axios from "axios";
-import {
-   Phone,
-   Lock,
-   Eye,
-   EyeOff,
-   ArrowRight,
-   ShieldCheck,
-   CheckCircle2,
-   AlertCircle,
-   ChevronLeft
+import { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { 
+  Phone, 
+  Lock, 
+  ChevronRight, 
+  ShieldCheck, 
+  Eye, 
+  EyeOff, 
+  Loader2,
+  AlertCircle
 } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
 import logoKandjou from "../assets/logo_kandjou.png";
-import loginBg from "../assets/kandjou_login_bg.png";
-
-const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
-
-const ROLE_ROUTES = {
-   "Client": "/dashboard",
-   "Agent de Crédit": "/agent",
-   "Administrateur": "/admin",
-   "Analyste Risque": "/risk",
-   "Régulateur (BCRG)": "/audit",
-};
 
 export default function LoginPage() {
-   const navigate = useNavigate();
-   const { login, isAuthenticated, user } = useAuth();
-   const { t } = useLanguage();
+  const navigate = useNavigate();
+  const { login } = useAuth();
+  
+  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-   const [form, setForm] = useState({ username: "", password: "" });
-   const [error, setError] = useState("");
-   const [loading, setLoading] = useState(false);
-   const [showPwd, setShowPwd] = useState(false);
-   const [remember, setRemember] = useState(false);
-   const [showReset, setShowReset] = useState(false);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+    try {
+      const success = await login(phone, password);
+      if (success) navigate("/dashboard");
+      else setError("Identifiants incorrects. Veuillez réessayer.");
+    } catch (err) {
+      setError("Une erreur est survenue. Vérifiez votre connexion.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-   useEffect(() => {
-      if (isAuthenticated && user) {
-         navigate(ROLE_ROUTES[user.role] || "/dashboard");
-      }
-   }, [isAuthenticated, user, navigate]);
-
-   const handleLogin = async (e) => {
-      e.preventDefault();
-      setError("");
-      if (!form.username.trim() || !form.password.trim()) {
-         setError(t("fillAllFields") || "Veuillez remplir tous les champs.");
-         return;
-      }
-      setLoading(true);
-      const result = await login(form.username.trim(), form.password);
-      if (!result.success) {
-         setError(result.message);
-         setLoading(false);
-      }
-   };
-
-   return (
-      <div style={S.page}>
-         <style>{CSS}</style>
-
-         {/* ── LEFT: VISUAL (PREMIUM SPLIT) ── */}
-         <div style={S.visualSide}>
-            <div style={S.overlay} />
-            <div style={S.visualContent}>
-               <img src={logoKandjou} alt="Kandjou" style={S.logoVisual} />
-               <div style={{ marginTop: "auto" }}>
-                  <h1 style={S.visualTitle}>{t("loginVisualTitle")}</h1>
-                  <p style={S.visualText}>{t("loginVisualSubtitle")}</p>
-                  <div style={S.visualStats}>
-                     <div style={S.vStat}>
-                        <div style={S.vStatVal}>2.4M</div>
-                        <div style={S.vStatLab}>{t("loginStatsUsers")}</div>
-                     </div>
-                     <div style={S.vStat}>
-                        <div style={S.vStatVal}>99.9%</div>
-                        <div style={S.vStatLab}>Uptime</div>
-                     </div>
-                  </div>
+  return (
+    <div className="login-page-container">
+      {/* Left Visual Side */}
+      <div className="login-visual">
+         <div className="visual-content">
+            <img src={logoKandjou} alt="Kandjou Logo" className="login-logo-top" />
+            <h1 className="visual-title">Le futur de la finance <br/>en Guinée est ici.</h1>
+            <p className="visual-subtitle">
+               Gérez vos comptes Orange Money, MTN MoMo et vos crédits sur une plateforme unique, sécurisée et certifiée par la BCRG.
+            </p>
+            <div className="visual-stats">
+               <div className="v-stat">
+                  <strong>250k+</strong>
+                  <span>Utilisateurs</span>
+               </div>
+               <div className="v-stat">
+                  <strong>99.9%</strong>
+                  <span>Disponibilité</span>
                </div>
             </div>
          </div>
-
-         {/* ── RIGHT: FORM ── */}
-         <div style={S.formSide}>
-            <div style={S.formScroll}>
-               <div style={S.formCard}>
-                  <div style={{ marginBottom: "3.5rem" }}>
-                     <img src={logoKandjou} alt="Logo" style={S.formLogo} />
-                     <h2 style={S.formTitle}>{t("loginTitle")}</h2>
-                     <p style={S.formSubtitle}>{t("loginSubtitle")}</p>
-                  </div>
-
-                  <form onSubmit={handleLogin} style={S.form}>
-                     <div style={S.inputGroup}>
-                        <label style={S.label}>{t("phoneLabel")}</label>
-                        <div style={S.inputWrap}>
-                           <Phone size={18} style={S.inputIcon} />
-                           <input
-                              type="text"
-                              placeholder={t("phonePlaceholder")}
-                              value={form.username}
-                              onChange={e => setForm({ ...form, username: e.target.value })}
-                              style={S.input}
-                           />
-                        </div>
-                     </div>
-
-                     <div style={S.inputGroup}>
-                        <label style={S.label}>{t("passwordLabel")}</label>
-                        <div style={S.inputWrap}>
-                           <Lock size={18} style={S.inputIcon} />
-                           <input
-                              type={showPwd ? "text" : "password"}
-                              placeholder="••••••••••••"
-                              value={form.password}
-                              onChange={e => setForm({ ...form, password: e.target.value })}
-                              style={S.input}
-                           />
-                           <button type="button" onClick={() => setShowPwd(!showPwd)} style={S.eyeBtn}>
-                              {showPwd ? <EyeOff size={18} /> : <Eye size={18} />}
-                           </button>
-                        </div>
-                     </div>
-
-                     <div style={S.options}>
-                        <label style={S.remember}>
-                           <input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} />
-                           {t("rememberMe")}
-                        </label>
-                        <button type="button" onClick={() => setShowReset(true)} style={S.forgot}>{t("forgotPassword")}</button>
-                     </div>
-
-                     {error && (
-                        <div style={S.error}>
-                           <AlertCircle size={16} /> {error}
-                        </div>
-                     )}
-
-                     <button type="submit" disabled={loading} style={S.submitBtn}>
-                        {loading ? t("btnChecking") : t("btnLogin")}
-                        {!loading && <ArrowRight size={18} style={{ marginLeft: 8 }} />}
-                     </button>
-                  </form>
-
-                  <div style={S.footer}>
-                     <p style={S.noAccount}>{t("noAccount")} <button onClick={() => navigate("/register")} style={S.regLink}>{t("createAccount")}</button></p>
-                     <div style={S.secBadge}>
-                        <ShieldCheck size={14} color="#10B981" />
-                        {t("encryptionMsg")}
-                     </div>
-                  </div>
-               </div>
-            </div>
-         </div>
-
+         <div className="visual-overlay" />
       </div>
-   );
+
+      {/* Right Form Side */}
+      <div className="login-form-side">
+         <div className="form-container">
+            <div className="form-header">
+               <h2>Connexion Sécurisée</h2>
+               <p>Saisissez vos identifiants pour accéder à votre espace.</p>
+            </div>
+
+            {error && (
+              <div className="error-box">
+                <AlertCircle size={18} />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="auth-form">
+               <div className="input-group">
+                  <label>Numéro de téléphone</label>
+                  <div className="input-wrapper">
+                     <Phone className="input-icon" size={20} />
+                     <input 
+                       type="text" 
+                       placeholder="Ex: 622 00 00 00" 
+                       value={phone} 
+                       onChange={(e) => setPhone(e.target.value)}
+                       required
+                     />
+                  </div>
+               </div>
+
+               <div className="input-group">
+                  <label>Mot de passe</label>
+                  <div className="input-wrapper">
+                     <Lock className="input-icon" size={20} />
+                     <input 
+                       type={showPassword ? "text" : "password"} 
+                       placeholder="••••••••" 
+                       value={password}
+                       onChange={(e) => setPassword(e.target.value)}
+                       required
+                     />
+                     <button 
+                       type="button" 
+                       className="eye-btn" 
+                       onClick={() => setShowPassword(!showPassword)}
+                     >
+                        {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                     </button>
+                  </div>
+               </div>
+
+               <div className="form-options">
+                  <label className="checkbox-wrap">
+                     <input type="checkbox" />
+                     <span>Se souvenir de moi</span>
+                  </label>
+                  <Link to="/forgot-password" title="Mot de passe oublié ?" className="forgot-link">Mot de passe oublié ?</Link>
+               </div>
+
+               <button type="submit" className="btn-auth-submit" disabled={loading}>
+                  {loading ? (
+                    <><Loader2 className="spin" size={20} /> Vérification...</>
+                  ) : (
+                    <>Se connecter <ChevronRight size={20} /></>
+                  )}
+               </button>
+            </form>
+
+            <div className="form-footer">
+               <p>Nouveau sur la plateforme ? <Link to="/register">Créer un compte</Link></p>
+            </div>
+
+            <div className="security-badge">
+               <ShieldCheck size={16} color="#10B981" />
+               <span>Chiffrement de bout en bout actif</span>
+            </div>
+         </div>
+      </div>
+
+      <style>{`
+        .login-page-container { display: flex; min-height: 100vh; background: #fff; font-family: 'Inter', sans-serif; }
+        .login-visual { flex: 1.2; background: url('/kandjou_login_bg.png') center/cover; position: relative; display: flex; align-items: center; padding: 4rem; color: #fff; }
+        .visual-overlay { position: absolute; inset: 0; background: linear-gradient(135deg, rgba(0,98,51,0.95) 0%, rgba(30,41,59,0.8) 100%); z-index: 1; }
+        .visual-content { position: relative; z-index: 2; max-width: 500px; }
+        .login-logo-top { height: 40px; margin-bottom: 3rem; filter: brightness(0) invert(1); }
+        .visual-title { font-size: 3.5rem; font-weight: 950; line-height: 1.1; margin-bottom: 1.5rem; letter-spacing: -2px; }
+        .visual-subtitle { font-size: 1.1rem; opacity: 0.9; line-height: 1.6; margin-bottom: 3rem; }
+        .visual-stats { display: flex; gap: 3rem; }
+        .v-stat { display: flex; flex-direction: column; }
+        .v-stat strong { font-size: 1.8rem; font-weight: 900; }
+        .v-stat span { font-size: 0.85rem; opacity: 0.7; font-weight: 600; }
+
+        .login-form-side { flex: 1; display: flex; align-items: center; justify-content: center; padding: 2rem; background: #fff; }
+        .form-container { width: 100%; max-width: 420px; }
+        .form-header { margin-bottom: 2.5rem; }
+        .form-header h2 { font-size: 2rem; font-weight: 950; color: #1E293B; letter-spacing: -1px; margin-bottom: 0.5rem; }
+        .form-header p { color: #64748B; font-weight: 600; }
+
+        .error-box { background: #FFF1F2; color: #E11D48; padding: 1rem; border-radius: 12px; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 10px; font-size: 0.9rem; font-weight: 700; border: 1px solid #FFE4E6; }
+
+        .auth-form { display: flex; flex-direction: column; gap: 1.5rem; }
+        .input-group label { display: block; font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 8px; }
+        .input-wrapper { position: relative; }
+        .input-icon { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: #94A3B8; transition: 0.2s; }
+        .input-wrapper input { width: 100%; padding: 1.1rem 1rem 1.1rem 3.5rem; border-radius: 14px; border: 2px solid #F1F5F9; background: #F8FAFC; font-size: 1rem; font-weight: 700; color: #1E293B; outline: none; transition: 0.2s; }
+        .input-wrapper input:focus { border-color: #006233; background: #fff; box-shadow: 0 0 0 4px rgba(0,98,51,0.05); }
+        .input-wrapper input:focus + .input-icon { color: #006233; }
+        .eye-btn { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); border: none; background: none; color: #94A3B8; cursor: pointer; display: flex; align-items: center; }
+
+        .form-options { display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; }
+        .checkbox-wrap { display: flex; align-items: center; gap: 8px; font-weight: 600; color: #64748B; cursor: pointer; }
+        .forgot-link { color: #006233; font-weight: 700; text-decoration: none; }
+
+        .btn-auth-submit { background: #1E293B; color: #fff; border: none; padding: 1.2rem; border-radius: 16px; font-size: 1.1rem; font-weight: 800; cursor: pointer; transition: 0.3s; display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 1rem; box-shadow: 0 10px 25px rgba(30,41,59,0.15); }
+        .btn-auth-submit:hover { background: #0F172A; transform: translateY(-2px); box-shadow: 0 15px 30px rgba(30,41,59,0.25); }
+        .btn-auth-submit:disabled { opacity: 0.7; cursor: not-allowed; transform: none; }
+
+        .form-footer { margin-top: 2.5rem; text-align: center; font-size: 0.95rem; color: #64748B; font-weight: 600; }
+        .form-footer a { color: #006233; font-weight: 800; text-decoration: none; margin-left: 5px; }
+
+        .security-badge { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 3rem; font-size: 0.75rem; font-weight: 800; color: #94A3B8; text-transform: uppercase; letter-spacing: 1px; }
+
+        .spin { animation: spin 1s linear infinite; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        @media (max-width: 1024px) {
+           .login-visual { display: none; }
+           .login-form-side { flex: 1; }
+        }
+      `}</style>
+    </div>
+  );
 }
-
-const CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');
-  body { margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
-  input:focus { border-color: #006233 !important; outline: none; box-shadow: 0 0 0 4px rgba(0,98,51,0.1); }
-  .submit-hover:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0,98,51,0.25); }
-`;
-
-const S = {
-   page: { display: "flex", minHeight: "100vh", background: "#fff" },
-
-   visualSide: {
-      flex: 1.2,
-      background: `url(${loginBg})`,
-      backgroundSize: "cover",
-      backgroundPosition: "center",
-      position: "relative",
-      display: "flex",
-      flexDirection: "column",
-      padding: "4rem",
-      "@media (max-width: 1024px)": { display: "none" }
-   },
-   overlay: { position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,0.2), rgba(0,61,32,0.85))" },
-   visualContent: { position: "relative", zIndex: 1, height: "100%", display: "flex", flexDirection: "column" },
-   logoVisual: { height: 60, width: "fit-content", objectFit: "contain", filter: "brightness(0) invert(1)" },
-   visualTitle: { color: "#fff", fontSize: "3.5rem", fontWeight: 950, letterSpacing: -2, lineHeight: 1.1, marginBottom: "1.5rem" },
-   visualText: { color: "rgba(255,255,255,0.8)", fontSize: "1.1rem", fontWeight: 500, lineHeight: 1.6, maxWidth: 500 },
-   visualStats: { display: "flex", gap: "3rem", marginTop: "3rem" },
-   vStatVal: { color: "#fff", fontSize: "1.8rem", fontWeight: 900 },
-   vStatLab: { color: "rgba(255,255,255,0.6)", fontSize: "0.8rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 },
-
-   formSide: { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", background: "#F8FAFC" },
-   formScroll: { width: "100%", maxWidth: 500, padding: "2rem" },
-   formCard: { background: "#fff", padding: "3rem", borderRadius: 32, boxShadow: "0 20px 50px rgba(0,0,0,0.04)", border: "1px solid #E2E8F0" },
-   mobileLogo: { height: 40, marginBottom: "2rem", display: "none", "@media (max-width: 1024px)": { display: "block" } },
-   formTitle: { fontSize: "1.8rem", fontWeight: 950, color: "#0F172A", margin: 0, letterSpacing: -1 },
-   formSubtitle: { fontSize: "0.9rem", color: "#64748B", fontWeight: 600, marginTop: 8 },
-   formLogo: { height: 50, marginBottom: "1.5rem", display: "block" },
-
-   form: { display: "flex", flexDirection: "column", gap: "1.5rem" },
-   inputGroup: { display: "flex", flexDirection: "column", gap: 8 },
-   label: { fontSize: "0.75rem", fontWeight: 800, color: "#475569", textTransform: "uppercase", letterSpacing: 0.5 },
-   inputWrap: { position: "relative" },
-   inputIcon: { position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "#94A3B8" },
-   input: { width: "100%", padding: "14px 14px 14px 48px", borderRadius: 14, border: "2px solid #F1F5F9", background: "#F8FAFC", fontSize: "1rem", fontWeight: 600, transition: "0.2s" },
-   eyeBtn: { position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#94A3B8", cursor: "pointer" },
-
-   options: { display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.85rem" },
-   remember: { display: "flex", alignItems: "center", gap: 8, color: "#64748B", fontWeight: 600, cursor: "pointer" },
-   forgot: { background: "none", border: "none", color: "#006233", fontWeight: 800, cursor: "pointer" },
-
-   error: { padding: "12px", background: "#FEF2F2", borderRadius: 12, color: "#DC2626", fontSize: "0.85rem", fontWeight: 700, display: "flex", alignItems: "center", gap: 10 },
-   submitBtn: {
-      width: "100%", padding: "1.1rem", borderRadius: 16, border: "none",
-      background: "linear-gradient(135deg, #006233 0%, #004D28 100%)", color: "#fff",
-      fontSize: "1rem", fontWeight: 900, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-      boxShadow: "0 10px 25px rgba(0,98,51,0.2)", transition: "0.2s"
-   },
-
-   footer: { marginTop: "2.5rem", textAlign: "center" },
-   noAccount: { fontSize: "0.9rem", color: "#64748B", fontWeight: 600 },
-   regLink: { background: "none", border: "none", color: "#006233", fontWeight: 900, cursor: "pointer", textDecoration: "underline" },
-   secBadge: { marginTop: "1.5rem", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: "0.7rem", fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" }
-};

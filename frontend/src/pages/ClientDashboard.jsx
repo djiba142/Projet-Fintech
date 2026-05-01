@@ -17,7 +17,6 @@ import {
   Target
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import { useLanguage } from "../context/LanguageContext";
 import useTransactionsSocket from "../hooks/useTransactionsSocket";
 import axios from "axios";
 import logoKandjou from "../assets/logo_kandjou.png";
@@ -31,7 +30,6 @@ const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
 export default function ClientDashboard() {
   const navigate = useNavigate();
   const { user, token } = useAuth();
-  const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
   const [transactions, setTransactions] = useState([]);
@@ -68,7 +66,7 @@ export default function ClientDashboard() {
   if (loading) return (
     <div className="flex-center" style={{ minHeight: "60vh" }}>
       <RefreshCcw className="spin" size={40} color="#006233" />
-      <p style={{ marginTop: "1rem", fontWeight: 700, color: "#64748B" }}>{t("syncing")}</p>
+      <p style={{ marginTop: "1rem", fontWeight: 700, color: "#64748B" }}>Synchronisation sécurisée...</p>
       <style>{`.spin { animation: spin 1s linear infinite; } @keyframes spin { 100% { transform: rotate(360deg); } } .flex-center { display: flex; flex-direction: column; align-items: center; justify-content: center; }`}</style>
     </div>
   );
@@ -80,7 +78,7 @@ export default function ClientDashboard() {
         <header className="dashboard-header">
           <div className="welcome-box">
              <img src={logoKandjou} alt="Kandjou" style={{ height: 36, marginBottom: 8 }} />
-             <p className="welcome-text">{t("welcome")}</p>
+             <p className="welcome-text">Bienvenue,</p>
              <h1 className="user-name">{user?.fullname || "Client"}</h1>
           </div>
           <div className="header-actions">
@@ -98,7 +96,7 @@ export default function ClientDashboard() {
               {/* CARTE SOLDE */}
               <div className="main-balance-card">
                   <div className="card-top">
-                    <p className="balance-label">{t("totalBalance")}</p>
+                    <p className="balance-label">Solde Total</p>
                     <div className="operator-badges">
                         <img src="/orange.png" alt="OM" />
                         <img src="/mtn.png" alt="MoMo" />
@@ -108,22 +106,22 @@ export default function ClientDashboard() {
                     <h2 className="amount-val" style={{ fontSize: "2.4rem" }}>{(data?.total_balance || 0).toLocaleString()} <span className="currency">GNF</span></h2>
                   </div>
                   <div className="card-actions">
-                    <button className="action-btn" onClick={() => navigate("/transfers")}><Plus size={20} /> {t("sendMoney")}</button>
-                    <button className="action-btn secondary" onClick={fetchData}><RefreshCcw size={18} /> {t("allTransactions")}</button>
+                    <button className="action-btn" onClick={() => navigate("/transfers")}><Plus size={20} /> Envoyer de l'argent</button>
+                    <button className="action-btn secondary" onClick={fetchData}><RefreshCcw size={18} /> Tout actualiser</button>
                   </div>
                   <div className="bg-pattern"></div>
               </div>
 
-              {/* ANALYTICS CHART (PRO) */}
+              {/* ANALYTICS CHART */}
               <div className="chart-card">
                   <div className="card-header">
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <PieChart size={18} color="#006233" />
-                      <h3>{t("financialFlows")}</h3>
+                      <h3>Flux financiers</h3>
                     </div>
                     <div className="chart-tabs">
-                        <button className={filter === '7d' ? 'active' : ''} onClick={() => setFilter('7d')}>{t("last7Days")}</button>
-                        <button className={filter === '30d' ? 'active' : ''} onClick={() => setFilter('30d')}>{t("last30Days")}</button>
+                        <button className={filter === '7d' ? 'active' : ''} onClick={() => setFilter('7d')}>7j</button>
+                        <button className={filter === '30d' ? 'active' : ''} onClick={() => setFilter('30d')}>30j</button>
                     </div>
                   </div>
                   <div className="chart-wrapper">
@@ -138,19 +136,19 @@ export default function ClientDashboard() {
            {/* ── DROITE : SCORE & TRANSACTIONS ── */}
            <div className="grid-right">
               
-              {/* KANDJOU SCORE (PRO) */}
+              {/* SCORE CARTE */}
               <div className="score-card">
                 <div className="card-header">
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <Target size={18} color="#006233" />
-                    <h3>{t("cardScore")}</h3>
+                    <h3>Score Kandjou</h3>
                   </div>
                 </div>
                 <div className="score-content">
                   <ScoreChart score={analytics.score || 78} />
                   <div className="score-info">
-                    <p className="score-status">{t("scoreStatus")}</p>
-                    <p className="score-desc">{t("scoreDesc")}</p>
+                    <p className="score-status">Excellent</p>
+                    <p className="score-desc">Votre éligibilité au crédit est optimale.</p>
                   </div>
                 </div>
               </div>
@@ -160,7 +158,7 @@ export default function ClientDashboard() {
                 <div className="live-transactions-section">
                   <div className="section-title">
                     <Zap size={16} color="#F59E0B" fill="#F59E0B" />
-                    <span>{t("live")}</span>
+                    <span>En direct</span>
                   </div>
                   <div className="live-list">
                     {liveTransactions.slice(0, 2).map(tx => (
@@ -168,7 +166,7 @@ export default function ClientDashboard() {
                         <div className="live-left">
                           <img src={tx.operator === 'ORANGE' ? '/orange.png' : '/mtn.png'} alt="Op" />
                           <div>
-                            <p className="live-title">{t("to")} {tx.recipient}</p>
+                            <p className="live-title">Vers {tx.recipient}</p>
                             <p className="live-msg">{tx.message}</p>
                           </div>
                         </div>
@@ -185,18 +183,18 @@ export default function ClientDashboard() {
               {/* DERNIÈRES TRANSACTIONS */}
               <div className="recent-tx-card">
                   <div className="card-header">
-                    <h3>{t("history")}</h3>
-                    <button className="view-all" onClick={() => navigate("/transactions")}>{t("allTransactions")}</button>
+                    <h3>Historique</h3>
+                    <button className="view-all" onClick={() => navigate("/transactions")}>Voir tout</button>
                   </div>
                   <div className="tx-filters">
-                    <button className={`filter-chip ${activeOp === 'ALL' ? 'active' : ''}`} onClick={() => setActiveOp('ALL')}>{t("all")}</button>
+                    <button className={`filter-chip ${activeOp === 'ALL' ? 'active' : ''}`} onClick={() => setActiveOp('ALL')}>Tous</button>
                     <button className={`filter-chip ${activeOp === 'ORANGE' ? 'active' : ''}`} onClick={() => setActiveOp('ORANGE')}>Orange</button>
                     <button className={`filter-chip ${activeOp === 'MTN' ? 'active' : ''}`} onClick={() => setActiveOp('MTN')}>MTN</button>
                   </div>
                   <div className="tx-list">
                     {(() => {
                         const filtered = transactions.filter(tx => activeOp === 'ALL' || tx.op === activeOp);
-                        if (filtered.length === 0) return <p className="empty-tx">{t("noTx")}</p>;
+                        if (filtered.length === 0) return <p className="empty-tx">Aucune transaction trouvée.</p>;
                         return filtered.map(tx => (
                           <div key={tx.id} className="tx-row">
                             <div className={`tx-icon ${tx.type.toLowerCase()}`}>
@@ -220,18 +218,14 @@ export default function ClientDashboard() {
 
       <style>{`
         .dashboard-container { padding: 2rem; max-width: 1400px; margin: 0 auto; display: flex; flex-direction: column; gap: 2rem; background: #F8FAFC; min-height: 100vh; }
-        
         .dashboard-header { display: flex; justify-content: space-between; align-items: center; }
         .welcome-text { font-size: 0.9rem; font-weight: 700; color: #64748B; margin: 0; }
         .user-name { font-size: 1.8rem; font-weight: 950; color: #1E293B; letter-spacing: -1px; margin: 0; }
         .header-actions { display: flex; gap: 1rem; align-items: center; }
         .icon-btn { width: 44px; height: 44px; border-radius: 14px; border: 1.5px solid #E2E8F0; background: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #64748B; }
         .user-avatar { width: 44px; height: 44px; border-radius: 14px; background: #006233; color: #fff; display: flex; align-items: center; justify-content: center; }
-
         .dashboard-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 2rem; }
-        
         .grid-left, .grid-right { display: flex; flex-direction: column; gap: 2rem; }
-
         .main-balance-card { background: #006233; border-radius: 24px; padding: 1.8rem; color: #fff; position: relative; overflow: hidden; box-shadow: 0 15px 35px rgba(0,98,51,0.15); }
         .card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
         .balance-label { font-size: 0.85rem; font-weight: 700; opacity: 0.8; margin: 0; }
@@ -244,21 +238,17 @@ export default function ClientDashboard() {
         .action-btn:hover { background: rgba(255,255,255,0.3); transform: translateY(-2px); }
         .action-btn.secondary { background: transparent; border: 1.5px solid rgba(255,255,255,0.3); }
         .bg-pattern { position: absolute; top: -50%; right: -20%; width: 300px; height: 300px; background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%); border-radius: 50%; }
-
         .chart-card, .score-card, .recent-tx-card { background: #fff; border-radius: 32px; padding: 2rem; border: 1.5px solid #E2E8F0; box-shadow: 0 10px 30px rgba(0,0,0,0.02); }
         .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
         .card-header h3 { font-size: 0.85rem; font-weight: 900; color: #1E293B; margin: 0; text-transform: uppercase; letter-spacing: 1px; }
-        
         .chart-tabs { display: flex; background: #F1F5F9; padding: 4px; border-radius: 12px; }
         .chart-tabs button { padding: 6px 14px; border: none; background: none; font-size: 0.7rem; font-weight: 800; color: #94A3B8; cursor: pointer; border-radius: 10px; transition: 0.2s; }
         .chart-tabs button.active { background: #fff; color: #1E293B; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
         .chart-wrapper { height: 280px; }
-
         .score-content { display: flex; flex-direction: column; align-items: center; gap: 1.5rem; }
         .score-info { text-align: center; }
         .score-status { font-size: 1.2rem; font-weight: 900; color: #10B981; margin: 0; }
         .score-desc { font-size: 0.75rem; color: #64748B; font-weight: 600; margin-top: 4px; }
-
         .section-title { display: flex; alignItems: center; gap: 8px; margin-bottom: 1rem; font-size: 0.75rem; font-weight: 900; text-transform: uppercase; color: #F59E0B; letter-spacing: 1px; }
         .live-list { display: flex; flex-direction: column; gap: 0.8rem; }
         .live-item { background: #fff; padding: 1rem; border-radius: 20px; border: 1.5px solid #F1F5F9; display: flex; justify-content: space-between; align-items: center; transition: 0.3s; }
@@ -271,12 +261,10 @@ export default function ClientDashboard() {
         .live-status { font-size: 0.6rem; font-weight: 900; text-transform: uppercase; }
         .live-item.success { border-color: #10B98133; background: #F0FDF4; }
         .live-item.success .live-status { color: #10B981; }
-
         .view-all { font-size: 0.7rem; font-weight: 800; color: #006233; background: #E6F0EB; border: none; padding: 6px 14px; border-radius: 99px; cursor: pointer; }
         .tx-filters { display: flex; gap: 8px; margin-bottom: 1.5rem; }
         .filter-chip { padding: 6px 16px; border-radius: 99px; border: 1.5px solid #F1F5F9; background: #fff; font-size: 0.7rem; font-weight: 800; color: #64748B; cursor: pointer; transition: 0.2s; }
         .filter-chip.active { background: #1E293B; color: #fff; border-color: #1E293B; }
-        
         .tx-list { display: flex; flex-direction: column; gap: 1.2rem; }
         .tx-row { display: flex; align-items: center; gap: 1rem; }
         .tx-icon { width: 38px; height: 38px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
@@ -289,10 +277,10 @@ export default function ClientDashboard() {
         .tx-val.credit { color: #10B981; }
         .tx-val.debit { color: #1E293B; }
         .empty-tx { text-align: center; color: #94A3B8; padding: 2rem; font-weight: 600; }
-
-        @media (max-width: 1024px) {
-           .dashboard-grid { grid-template-columns: 1fr; }
-        }
+        .flex-center { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .spin { animation: spin 1s linear infinite; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        @media (max-width: 1024px) { .dashboard-grid { grid-template-columns: 1fr; } }
       `}</style>
     </div>
   );

@@ -10,8 +10,6 @@ import {
 } from "chart.js";
 import { Bar, Line } from "react-chartjs-2";
 
-import { useLanguage } from "../../context/LanguageContext";
-
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -23,12 +21,10 @@ ChartJS.register(
 );
 
 export default function TransactionsChart({ data, type = "bar" }) {
-  const { t } = useLanguage();
-
   if (!data || !data.labels || data.labels.length === 0) {
     return (
       <div style={{ height: 250, display: "flex", alignItems: "center", justifyContent: "center", background: "#F8FAFC", borderRadius: 20, color: "#94A3B8", fontWeight: 700, fontSize: "0.8rem" }}>
-        {t("noTx")}
+        Aucune donnée d'analyse disponible
       </div>
     );
   }
@@ -37,7 +33,7 @@ export default function TransactionsChart({ data, type = "bar" }) {
     labels: data.labels,
     datasets: [
       {
-        label: `${t("income")} (GNF)`,
+        label: "Entrées (GNF)",
         data: data.in,
         backgroundColor: "#006233",
         borderColor: "#006233",
@@ -46,7 +42,7 @@ export default function TransactionsChart({ data, type = "bar" }) {
         barThickness: 20,
       },
       {
-        label: `${t("expenses")} (GNF)`,
+        label: "Sorties (GNF)",
         data: data.out,
         backgroundColor: "#10B981",
         borderColor: "#10B981",
@@ -60,9 +56,6 @@ export default function TransactionsChart({ data, type = "bar" }) {
   const options = {
     responsive: true,
     maintainAspectRatio: false,
-    animation: {
-      duration: 0 // Optimisation Afrique : désactiver animations lourdes
-    },
     plugins: {
       legend: {
         position: "top",
@@ -88,10 +81,7 @@ export default function TransactionsChart({ data, type = "bar" }) {
     scales: {
       y: {
         beginAtZero: true,
-        grid: {
-          display: true,
-          color: "#F1F5F9"
-        },
+        grid: { display: true, color: "#F1F5F9" },
         ticks: {
           font: { size: 10, weight: 'bold' },
           color: "#94A3B8",
@@ -99,9 +89,7 @@ export default function TransactionsChart({ data, type = "bar" }) {
         }
       },
       x: {
-        grid: {
-          display: false
-        },
+        grid: { display: false },
         ticks: {
           font: { size: 10, weight: 'bold' },
           color: "#94A3B8"

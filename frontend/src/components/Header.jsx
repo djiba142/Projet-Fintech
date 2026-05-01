@@ -1,144 +1,229 @@
 import { useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import { useLanguage } from "../context/LanguageContext";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import logoKandjou from "../assets/logo_kandjou.png";
-
-const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
+import { 
+  Menu, 
+  X, 
+  User, 
+  LogOut, 
+  ChevronDown,
+  LayoutDashboard,
+  Settings,
+  Bell
+} from "lucide-react";
 
 export default function Header() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const { user } = useAuth();
-  const { language, setLanguage, t } = useLanguage();
-  const [showLang, setShowLang] = useState(false);
-
-  const changeLang = async (code) => {
-    setLanguage(code);
-    setShowLang(false);
-
-    // Sync with backend if logged in
-    if (user?.username) {
-      try {
-        await fetch(`${API}/m3/auth/update-language`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username: user.username, language: code })
-        });
-      } catch (err) {
-        console.error("Failed to sync language:", err);
-      }
-    }
-  };
+  const { user, logout, isAuthenticated } = useAuth();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   const scrollTo = (id) => {
-    if (location.pathname !== "/") {
-      navigate("/");
-      setTimeout(() => {
-        const el = document.getElementById(id);
-        if (el) {
-          const offset = 80;
-          window.scrollTo({ top: el.offsetTop - offset, behavior: "smooth" });
-        }
-      }, 300);
-    } else {
-      const el = document.getElementById(id);
-      if (el) {
-        const offset = 80;
-        window.scrollTo({ top: el.offsetTop - offset, behavior: "smooth" });
-      }
-    }
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: "smooth" });
+    setIsMenuOpen(false);
   };
 
-  const languages = [
-    { code: "FR", name: "Français" },
-    { code: "EN", name: "Anglais" },
-    { code: "NK", name: "N'ko (ߒߞߏ)" },
-    { code: "AD", name: "ADLAM (𞤀𞤣𞤤𞤢𞤥)" },
-    { code: "AR", name: "Arabe (🇸🇦)" }
-  ];
-
   return (
-    <header style={s.header}>
-      <div style={s.logoWrap} onClick={() => navigate("/")}>
-        <img src={logoKandjou} alt="Kandjou Logo" style={s.logoImg} />
-      </div>
-
-      <nav style={s.nav}>
-        {[
-          { label: t("navHome"), id: "hero" },
-          { label: t("navFeatures"), id: "features" },
-          { label: t("navHow"), id: "how-it-works" },
-          { label: t("navAbout"), id: "about" },
-          { label: t("navContact"), id: "footer" }
-        ].map((item) => (
-          <button 
-            key={item.id} 
-            onClick={() => scrollTo(item.id)}
-            style={s.navLink}
-            onMouseOver={(e) => e.target.style.color = "#2D6A4F"}
-            onMouseOut={(e) => e.target.style.color = "#666"}
-          >
-            {item.label}
-          </button>
-        ))}
-      </nav>
-
-      <div style={s.actions}>
-        <div style={s.langWrapper}>
-          <button style={s.langBtn} onClick={() => setShowLang(!showLang)}>
-            🌐 {language} ▾
-          </button>
-          {showLang && (
-            <div style={s.langDropdown}>
-              {languages.map((l) => (
-                <div 
-                  key={l.code} 
-                  style={s.langItem}
-                  onClick={() => changeLang(l.code)}
-                  onMouseOver={(e) => e.target.style.background = "#F0FFF4"}
-                  onMouseOut={(e) => e.target.style.background = "transparent"}
-                >
-                  {l.name}
-                </div>
-              ))}
-            </div>
-          )}
+    <header style={S.header}>
+      <div style={S.container}>
+        {/* LOGO */}
+        <div style={S.logoWrap} onClick={() => navigate("/")}>
+          <img src={logoKandjou} alt="Kandjou Logo" style={S.logoImg} />
         </div>
 
-        {user ? (
-          <button 
-            onClick={() => {
-              const dest = user.role === "Agent de Crédit" ? "/agent" : 
-                           user.role === "Administrateur" ? "/admin" : "/dashboard";
-              navigate(dest);
-            }} 
-            style={s.btnPrim}
-          >
-            Dashboard
+        {/* NAV DESKTOP */}
+        <nav style={S.nav}>
+          <span style={S.navLink} onClick={() => navigate("/")}>Accueil</span>
+          <span style={S.navLink} onClick={() => scrollTo("features")}>Fonctionnalités</span>
+          <span style={S.navLink} onClick={() => scrollTo("how-it-works")}>Comment ça marche ?</span>
+          <span style={S.navLink} onClick={() => scrollTo("about")}>À propos</span>
+          <span style={S.navLink} onClick={() => scrollTo("footer")}>Contact</span>
+        </nav>
+
+        {/* ACTIONS */}
+        <div style={S.actions}>
+          {!isAuthenticated ? (
+            <>
+              <button style={S.btnLogin} onClick={() => navigate("/login")}>Connexion</button>
+              <button style={S.btnRegister} onClick={() => navigate("/register")}>Créer un compte</button>
+            </>
+          ) : (
+            <div style={S.userArea}>
+              <button style={S.btnDash} onClick={() => navigate("/dashboard")}>
+                <LayoutDashboard size={18} /> Dashboard
+              </button>
+              <div style={S.profileWrap}>
+                <button style={S.avatarBtn} onClick={() => setIsProfileOpen(!isProfileOpen)}>
+                  <div style={S.avatar}><User size={20} /></div>
+                  <ChevronDown size={14} />
+                </button>
+                {isProfileOpen && (
+                  <div style={S.dropdown}>
+                    <div style={S.dropUser}>
+                       <strong>{user?.fullname}</strong>
+                       <span>{user?.role}</span>
+                    </div>
+                    <div style={S.dropDivider} />
+                    <button style={S.dropItem} onClick={() => navigate("/profile")}><User size={16} /> Profil</button>
+                    <button style={S.dropItem} onClick={() => navigate("/settings")}><Settings size={16} /> Paramètres</button>
+                    <div style={S.dropDivider} />
+                    <button style={S.dropLogout} onClick={logout}><LogOut size={16} /> Déconnexion</button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          
+          <button style={S.mobileToggle} onClick={() => setIsMenuOpen(!isMenuOpen)}>
+            {isMenuOpen ? <X /> : <Menu />}
           </button>
-        ) : (
-          <>
-            <button onClick={() => navigate("/login")} style={s.btnSec}>{t("login")}</button>
-            <button onClick={() => navigate("/register")} style={s.btnPrim}>{t("register")}</button>
-          </>
-        )}
+        </div>
       </div>
     </header>
   );
 }
 
-const s = {
-  header: { background: "#fff", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.8rem 4rem", boxShadow: "0 4px 20px rgba(0,0,0,0.02)", borderBottom: "1px solid #F1F5F9", position: "sticky", top: 0, zIndex: 1000, fontFamily: "'Plus Jakarta Sans', sans-serif" },
-  logoWrap: { display: "flex", alignItems: "center", cursor: "pointer" },
-  logoImg: { height: 50, objectFit: "contain" },
-  nav: { display: "flex", gap: "2rem" },
-  navLink: { background: "none", border: "none", color: "#666", fontSize: "0.85rem", fontWeight: 700, cursor: "pointer", transition: "all 0.2s" },
-  actions: { display: "flex", alignItems: "center", gap: "1.2rem" },
-  langWrapper: { position: "relative" },
-  langBtn: { background: "#F8FAFC", border: "1.5px solid #E2E8F0", borderRadius: 10, padding: "0.6rem 1rem", fontSize: "0.8rem", fontWeight: 800, cursor: "pointer", color: "#475569" },
-  langDropdown: { position: "absolute", top: "110%", right: 0, background: "#fff", border: "1.5px solid #E2E8F0", borderRadius: 12, boxShadow: "0 10px 25px rgba(0,0,0,0.05)", minWidth: 140, overflow: "hidden", zIndex: 1100 },
-  langItem: { padding: "0.8rem 1.2rem", fontSize: "0.85rem", fontWeight: 600, color: "#475569", cursor: "pointer", transition: "all 0.2s" },
-  btnSec: { background: "transparent", border: "1.5px solid #2D6A4F", color: "#2D6A4F", borderRadius: 12, fontSize: "0.85rem", fontWeight: 800, cursor: "pointer", padding: "0.7rem 1.5rem", transition: "all 0.2s" },
-  btnPrim: { background: "#2D6A4F", border: "none", color: "#fff", borderRadius: 12, padding: "0.7rem 1.8rem", fontSize: "0.85rem", fontWeight: 800, cursor: "pointer", boxShadow: "0 8px 20px rgba(45,106,79,0.15)", transition: "all 0.2s" },
+const S = {
+  header: {
+    height: "80px",
+    background: "rgba(255, 255, 255, 0.8)",
+    backdropFilter: "blur(20px)",
+    borderBottom: "1px solid rgba(0, 0, 0, 0.05)",
+    position: "sticky",
+    top: 0,
+    zIndex: 1000,
+    display: "flex",
+    alignItems: "center"
+  },
+  container: {
+    width: "100%",
+    maxWidth: "1400px",
+    margin: "0 auto",
+    padding: "0 2rem",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center"
+  },
+  logoWrap: { cursor: "pointer" },
+  logoImg: { height: "35px" },
+  nav: {
+    display: "flex",
+    gap: "2.5rem",
+    "@media (max-width: 1024px)": { display: "none" }
+  },
+  navLink: {
+    fontSize: "0.9rem",
+    fontWeight: 600,
+    color: "#475569",
+    cursor: "pointer",
+    transition: "0.2s"
+  },
+  actions: { display: "flex", alignItems: "center", gap: "1.5rem" },
+  btnLogin: {
+    background: "none",
+    border: "none",
+    fontSize: "0.9rem",
+    fontWeight: 700,
+    color: "#1E293B",
+    cursor: "pointer"
+  },
+  btnRegister: {
+    background: "#006233",
+    color: "#fff",
+    border: "none",
+    padding: "0.8rem 1.5rem",
+    borderRadius: "12px",
+    fontSize: "0.9rem",
+    fontWeight: 700,
+    cursor: "pointer",
+    boxShadow: "0 10px 20px rgba(0, 98, 51, 0.2)"
+  },
+  userArea: { display: "flex", alignItems: "center", gap: "1rem" },
+  btnDash: {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    background: "#F1F5F9",
+    border: "none",
+    padding: "0.6rem 1rem",
+    borderRadius: "10px",
+    fontSize: "0.85rem",
+    fontWeight: 700,
+    color: "#1E293B",
+    cursor: "pointer"
+  },
+  profileWrap: { position: "relative" },
+  avatarBtn: {
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    background: "none",
+    border: "none",
+    cursor: "pointer"
+  },
+  avatar: {
+    width: "36px",
+    height: "36px",
+    borderRadius: "10px",
+    background: "#006233",
+    color: "#fff",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  dropdown: {
+    position: "absolute",
+    top: "120%",
+    right: 0,
+    width: "220px",
+    background: "#fff",
+    borderRadius: "16px",
+    boxShadow: "0 20px 40px rgba(0,0,0,0.1)",
+    border: "1px solid #F1F5F9",
+    padding: "0.8rem",
+    display: "flex",
+    flexDirection: "column",
+    gap: "4px"
+  },
+  dropUser: {
+    padding: "0.5rem 0.8rem",
+    display: "flex",
+    flexDirection: "column"
+  },
+  dropDivider: { height: "1px", background: "#F1F5F9", margin: "4px 0" },
+  dropItem: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    padding: "0.7rem 0.8rem",
+    borderRadius: "10px",
+    border: "none",
+    background: "none",
+    fontSize: "0.85rem",
+    fontWeight: 600,
+    color: "#475569",
+    textAlign: "left",
+    cursor: "pointer"
+  },
+  dropLogout: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    padding: "0.7rem 0.8rem",
+    borderRadius: "10px",
+    border: "none",
+    background: "#FFF1F2",
+    fontSize: "0.85rem",
+    fontWeight: 700,
+    color: "#E11D48",
+    textAlign: "left",
+    cursor: "pointer",
+    marginTop: "4px"
+  },
+  mobileToggle: {
+    display: "none",
+    "@media (max-width: 1024px)": { display: "block", background: "none", border: "none", cursor: "pointer" }
+  }
 };
