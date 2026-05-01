@@ -144,6 +144,6 @@ const s = {
   langBtn: { background: "#F8FAFC", border: "1.5px solid #E2E8F0", borderRadius: 10, padding: "0.6rem 1rem", fontSize: "0.8rem", fontWeight: 800, cursor: "pointer", color: "#475569" },
   langDropdown: { position: "absolute", top: "110%", right: 0, background: "#fff", border: "1.5px solid #E2E8F0", borderRadius: 12, boxShadow: "0 10px 25px rgba(0,0,0,0.05)", minWidth: 140, overflow: "hidden", zIndex: 1100 },
   langItem: { padding: "0.8rem 1.2rem", fontSize: "0.85rem", fontWeight: 600, color: "#475569", cursor: "pointer", transition: "all 0.2s" },
-  btnSec: { background: "transparent", border: "none", color: "#2D6A4F", fontSize: "0.85rem", fontWeight: 800, cursor: "pointer", padding: "0.6rem 1rem" },
-  btnPrim: { background: "#2D6A4F", border: "none", color: "#fff", borderRadius: 12, padding: "0.7rem 1.5rem", fontSize: "0.85rem", fontWeight: 800, cursor: "pointer", boxShadow: "0 8px 20px rgba(45,106,79,0.15)", transition: "all 0.2s" },
+  btnSec: { background: "transparent", border: "1.5px solid #2D6A4F", color: "#2D6A4F", borderRadius: 12, fontSize: "0.85rem", fontWeight: 800, cursor: "pointer", padding: "0.7rem 1.5rem", transition: "all 0.2s" },
+  btnPrim: { background: "#2D6A4F", border: "none", color: "#fff", borderRadius: 12, padding: "0.7rem 1.8rem", fontSize: "0.85rem", fontWeight: 800, cursor: "pointer", boxShadow: "0 8px 20px rgba(45,106,79,0.15)", transition: "all 0.2s" },
 };

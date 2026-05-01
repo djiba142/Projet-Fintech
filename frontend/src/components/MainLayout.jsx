@@ -116,7 +116,7 @@ export default function MainLayout({ children }) {
           navigate(dest); 
           setIsMobileMenuOpen(false); 
         }}>
-        <img src="/logo_kandjou.png" alt="Kandjou Logo" style={{ height: 40, objectFit: "contain", filter: "brightness(0) invert(1)" }} />
+        <img src="/logo_kandjou.png" alt="Kandjou Logo" style={{ height: 48, objectFit: "contain" }} />
         <span style={{ color: "#fff", marginLeft: 10, fontWeight: 900, fontSize: "1.2rem", letterSpacing: -0.5 }}>KANDJOU</span>
       </div>
 
