@@ -164,7 +164,7 @@ def calculate_score(orange_score: int, mtn_score: int, policy):
 @router.get("/aggregate/{msisdn}")
 async def aggregate(
     msisdn: str,
-    strategy: str = Query("v1", description="Strategie de scoring"),
+    strategy: str = "v1",
     token_data: Dict = Depends(require_valid_token)
 ):
     """
@@ -287,7 +287,7 @@ async def aggregate(
 @router.get("/score/{msisdn}")
 async def get_score_alias(msisdn: str, token_data: Dict = Depends(require_valid_token)):
     """Alias pour /aggregate/{msisdn} utilisé par le frontend."""
-    return await aggregate(msisdn, token_data=token_data)
+    return await aggregate(msisdn, strategy="v1", token_data=token_data)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Gestion des Transactions (M1 Aggregated)
@@ -693,7 +693,7 @@ async def get_user_analytics(username: str, token_data: Dict = Depends(require_v
     # 4. Calcul du Score Réel via le moteur Kandjou
     try:
         # On réutilise la logique d'agrégation qui inclut déjà le scoring
-        agg_data = await aggregate(username, token_data=token_data)
+        agg_data = await aggregate(username, strategy="v1", token_data=token_data)
         real_score = agg_data["credit_analysis"]["score"]
     except:
         real_score = 0

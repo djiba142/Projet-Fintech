@@ -55,7 +55,7 @@ class V1ScoringStrategy(ScoringStrategy):
     @staticmethod
     def _interpret(score: int, total: float, threshold: Optional[int] = None) -> tuple[str, str]:
         # Utilisation du seuil dynamique (défaut 71 si non fourni)
-        min_eligible = threshold if threshold is not None else 71
+        min_eligible = int(threshold) if threshold is not None else 71
         
         if score >= min_eligible:
             cap = int(total * 0.30)

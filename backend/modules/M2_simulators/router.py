@@ -69,7 +69,7 @@ FEE_SCHEDULE = {
     "TRANSFER_SAME_OPERATOR": 0.005,   # 0.5% — Orange→Orange ou MTN→MTN
     "TRANSFER_INTEROP":       0.010,   # 1.0% — Orange→MTN ou MTN→Orange
     "WITHDRAWAL":             0.010,   # 1.0% — Retrait chez agent
-    "DEPOSIT":                0.000,   # 0.0% — Dépôt toujours gratuit
+    "DEPOSIT":                0.005,   # 0.5% — Dépôt (Frais de traitement)
 }
 
 FEE_MIN = 500   # Frais minimum en GNF
@@ -86,14 +86,28 @@ def compute_fee(amount: int, fee_type: str) -> int:
     return fee
 
 def is_interop(from_operator: str, to_msisdn: str) -> bool:
-    """Détecte si le transfert est inter-opérateur."""
+    """Détecte si le transfert est inter-opérateur en utilisant les préfixes si non en mémoire."""
     from .mock_data import ORANGE_ACCOUNTS, MTN_ACCOUNTS
+    
+    # 1. Vérification par préfixes (Plus robuste pour le simulateur)
+    clean = to_msisdn.replace("+", "").replace("224", "")
+    is_orange_prefix = clean.startswith("62") or clean.startswith("61")
+    is_mtn_prefix = clean.startswith("66") or clean.startswith("65")
+    
+    if from_operator.upper() == "ORANGE" and is_mtn_prefix:
+        return True
+    if from_operator.upper() == "MTN" and is_orange_prefix:
+        return True
+        
+    # 2. Fallback par mémoire (si préfixes non standard)
     dest_is_orange = to_msisdn in ORANGE_ACCOUNTS
     dest_is_mtn = to_msisdn in MTN_ACCOUNTS
+    
     if from_operator.upper() == "ORANGE" and dest_is_mtn and not dest_is_orange:
         return True
     if from_operator.upper() == "MTN" and dest_is_orange and not dest_is_mtn:
         return True
+        
     return False
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -128,35 +142,50 @@ def persist_transaction(tx_id: str, client_id: str, operator: str, tx_type: str,
 
 @router.get("/provider/orange/balance/{msisdn}")
 async def get_orange_balance(msisdn: str):
-    """Retourne le solde Orange Money pour un MSISDN donné (Auto-création si nouveau)."""
+    """Retourne le solde Orange Money pour un MSISDN donné (Récupère en DB)."""
     await asyncio.sleep(LATENCY_SECONDS)
     if msisdn in SIMULATED_OUTAGE_MSISDNS:
         logger.warning(f"⚠️ Panne simulée Orange pour {msisdn}")
         raise HTTPException(status_code=503, detail="Service Orange temporairement indisponible")
     
+    # Tentative de récupération en DB pour être à jour avec les modifications externes (MySQL)
+    db_bal = get_sim_balance(msisdn)
+    if db_bal is not None:
+        if msisdn not in ORANGE_ACCOUNTS:
+            ORANGE_ACCOUNTS[msisdn] = {"msisdn": msisdn, "available_balance": db_bal, "last_deposit": None, "status": "ACTIVE"}
+        else:
+            ORANGE_ACCOUNTS[msisdn]["available_balance"] = db_bal
+        return ORANGE_ACCOUNTS[msisdn]
+
     if msisdn not in ORANGE_ACCOUNTS:
         ORANGE_ACCOUNTS[msisdn] = {"msisdn": msisdn, "available_balance": 0, "last_deposit": None, "status": "ACTIVE"}
+        update_sim_balance(msisdn, "ORANGE", 0) # Persistance immédiate
         logger.info(f"🆕 Compte Orange auto-créé pour {msisdn}")
         
-    account = ORANGE_ACCOUNTS.get(msisdn)
-    logger.info(f"📱 Orange → Solde retourné pour {msisdn}")
-    return account
+    return ORANGE_ACCOUNTS[msisdn]
 
 @router.get("/provider/mtn/balance/{msisdn}")
 async def get_mtn_balance(msisdn: str):
-    """Retourne le solde MTN MoMo pour un MSISDN donné (Auto-création si nouveau)."""
+    """Retourne le solde MTN MoMo pour un MSISDN donné (Récupère en DB)."""
     await asyncio.sleep(LATENCY_SECONDS)
     if msisdn in SIMULATED_OUTAGE_MSISDNS:
         logger.warning(f"⚠️ Panne simulée MTN pour {msisdn}")
         raise HTTPException(status_code=503, detail="Service MTN temporairement indisponible")
     
+    db_bal = get_sim_balance(msisdn)
+    if db_bal is not None:
+        if msisdn not in MTN_ACCOUNTS:
+            MTN_ACCOUNTS[msisdn] = {"subscriber_number": msisdn, "current_balance": db_bal, "currency": "GNF", "account_state": "OPEN"}
+        else:
+            MTN_ACCOUNTS[msisdn]["current_balance"] = db_bal
+        return MTN_ACCOUNTS[msisdn]
+
     if msisdn not in MTN_ACCOUNTS:
         MTN_ACCOUNTS[msisdn] = {"subscriber_number": msisdn, "current_balance": 0, "currency": "GNF", "account_state": "OPEN"}
+        update_sim_balance(msisdn, "MTN", 0) # Persistance immédiate
         logger.info(f"🆕 Compte MTN auto-créé pour {msisdn}")
         
-    account = MTN_ACCOUNTS.get(msisdn)
-    logger.info(f"📱 MTN → Solde retourné pour {msisdn}")
-    return account
+    return MTN_ACCOUNTS[msisdn]
 
 @router.get("/provider/orange/transactions/{msisdn}")
 async def get_orange_transactions(msisdn: str):
@@ -484,7 +513,8 @@ async def execute_simulated_deposit(req: DepositRequest):
         acc = ORANGE_ACCOUNTS.get(msisdn)
         if not acc:
             raise HTTPException(status_code=404, detail="Abonné Orange introuvable")
-        acc["available_balance"] += amount
+        fee = compute_fee(amount, "DEPOSIT")
+        acc["available_balance"] += (amount - fee)
         update_sim_balance(msisdn, "ORANGE", acc["available_balance"])
         tx_list = ORANGE_TRANSACTIONS
         new_balance = acc["available_balance"]
@@ -493,7 +523,8 @@ async def execute_simulated_deposit(req: DepositRequest):
         acc = MTN_ACCOUNTS.get(msisdn)
         if not acc:
             raise HTTPException(status_code=404, detail="Abonné MTN introuvable")
-        acc["current_balance"] += amount
+        fee = compute_fee(amount, "DEPOSIT")
+        acc["current_balance"] += (amount - fee)
         update_sim_balance(msisdn, "MTN", acc["current_balance"])
         tx_list = MTN_TRANSACTIONS
         new_balance = acc["current_balance"]
@@ -520,10 +551,10 @@ async def execute_simulated_deposit(req: DepositRequest):
         client_id=req.client_id or msisdn,
         operator=op,
         tx_type="DEPOSIT",
-        amount=amount,
-        fee=0,
+        amount=amount - fee,
+        fee=fee,
         receiver=msisdn,
-        description=f"Dépôt Cash-in Agent #{req.agent_id} (Gratuit)",
+        description=f"Dépôt Cash-in via Agent #{req.agent_id} | Frais: {fee:,} GNF",
         status="SUCCESS"
     )
 

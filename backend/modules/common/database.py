@@ -232,10 +232,16 @@ def init_db():
 def _to_dict(row, cursor):
     """Convertit une ligne de résultat en dictionnaire (Compatible SQLite/MySQL)."""
     if row is None: return None
-    if hasattr(row, '__dict__') and 'Row' in str(type(row)): # SQLite Row
+    # Si c'est déjà un dictionnaire (cas MySQL cursor(dictionary=True))
+    if isinstance(row, dict):
+        return row
+    # Cas SQLite Row
+    if hasattr(row, '__dict__') and 'Row' in str(type(row)):
         return dict(row)
-    # MySQL or standard tuple
-    return dict(zip(cursor.column_names, row))
+    # Cas standard tuple (Fallback)
+    if hasattr(cursor, 'column_names'):
+        return dict(zip(cursor.column_names, row))
+    return row
 
 # --- Fonctions Utilisateurs ---
 
@@ -323,7 +329,9 @@ def get_risk_threshold():
         row = cursor.fetchone()
         data = _to_dict(row, cursor)
         conn.close()
-        return data['min_score_threshold'] if data else 65
+        if data and data.get('min_score_threshold'):
+            return int(data['min_score_threshold'])
+        return 65
     except Exception:
         return 65
 
