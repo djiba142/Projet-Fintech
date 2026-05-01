@@ -64,7 +64,7 @@ def init_db():
     
     is_mysql = not isinstance(conn, sqlite3.Connection)
     pk_inc = "INTEGER PRIMARY KEY AUTO_INCREMENT" if is_mysql else "INTEGER PRIMARY KEY AUTOINCREMENT"
-    text_type = "VARCHAR(255)" if is_mysql else "TEXT"
+    text_type = "VARCHAR(191)" if is_mysql else "TEXT"
     long_text = "TEXT" if is_mysql else "TEXT"
     
     # Tables de base
@@ -86,6 +86,7 @@ def init_db():
             email {text_type},
             msisdn_orange {text_type},
             msisdn_mtn {text_type},
+            profile_type {text_type},
             language {text_type} DEFAULT 'FR',
             status {text_type} DEFAULT 'active',
             institution {text_type},
@@ -204,6 +205,26 @@ def init_db():
     if count == 0:
         cursor.execute(f"INSERT INTO risk_policy (min_score_threshold) VALUES ({65})")
 
+    # Migrations automatiques pour MySQL/SQLite
+    migrations = [
+        ("users", "profile_type", f"ALTER TABLE users ADD COLUMN profile_type {text_type}"),
+        ("users", "address", f"ALTER TABLE users ADD COLUMN address {long_text}"),
+        ("users", "created_at", "ALTER TABLE users ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"),
+    ]
+    
+    for table, col, sql in migrations:
+        try:
+            if is_mysql:
+                # Check column existence in MySQL
+                cursor.execute(f"SHOW COLUMNS FROM {table} LIKE '{col}'")
+                if not cursor.fetchone():
+                    cursor.execute(sql)
+            else:
+                # SQLite (try/except approach)
+                cursor.execute(sql)
+        except Exception:
+            pass # Déjà existant ou autre erreur mineure
+
     if not is_mysql:
         conn.commit()
     conn.close()
@@ -238,16 +259,16 @@ def get_all_users():
     conn.close()
     return users
 
-def create_user(username, password, role, fullname, email=None, msisdn_orange=None, msisdn_mtn=None, address="Conakry, Guinée", language='FR'):
+def create_user(username, password, role, fullname, email=None, msisdn_orange=None, msisdn_mtn=None, profile_type=None, address="Conakry, Guinée", language='FR'):
     conn = get_db_connection()
     if not conn: return {"error": "DB Connection failed"}
     cursor = conn.cursor()
     p = get_placeholder()
     try:
         cursor.execute(f"""
-            INSERT INTO users (username, password, role, fullname, email, msisdn_orange, msisdn_mtn, address, language)
-            VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p})
-        """, (username, password, role, fullname, email, msisdn_orange, msisdn_mtn, address, language))
+            INSERT INTO users (username, password, role, fullname, email, msisdn_orange, msisdn_mtn, profile_type, address, language)
+            VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p})
+        """, (username, password, role, fullname, email, msisdn_orange, msisdn_mtn, profile_type, address, language))
         if isinstance(conn, sqlite3.Connection): conn.commit()
         return {"status": "success"}
     except Exception as e:
