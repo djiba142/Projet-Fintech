@@ -38,7 +38,7 @@ export default function RegisterPage() {
       <div style={s.left}>
         <div style={s.leftContent}>
           <div style={s.logoWrap} onClick={() => navigate("/")}>
-            <img src={logoKandjou} alt="Kandjou Logo" style={s.logoImg} />
+            <img src={logoKandjou} alt="Kandjou Logo" style={{ ...s.logoImg, filter: "brightness(0) invert(1)" }} />
           </div>
 
           <div style={s.brandingInfo}>

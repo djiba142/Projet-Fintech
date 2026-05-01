@@ -95,6 +95,21 @@ def init_db():
             last_ping TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+
+    # Table des transactions réelles (Grand Livre)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS transactions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tx_id VARCHAR(50) UNIQUE,
+            client_id VARCHAR(190),
+            operator VARCHAR(20), -- ORANGE, MTN
+            type VARCHAR(20), -- DEBIT, CREDIT
+            amount DECIMAL(15, 2),
+            description TEXT,
+            status VARCHAR(20) DEFAULT 'SUCCESS',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
     
     # Table de configuration globale
     cursor.execute("""
@@ -150,6 +165,28 @@ def init_db():
         ]
         cursor.executemany("INSERT INTO institutions (name, type, api_status, uptime_score, total_volume) VALUES (?, ?, ?, ?, ?)", insts)
         
+    # Default Transactions for BCRG visibility
+    cursor.execute("SELECT COUNT(*) FROM transactions")
+    if cursor.fetchone()[0] == 0:
+        import uuid
+        txs = []
+        for i in range(40):
+            op = "ORANGE" if i % 2 == 0 else "MTN"
+            tx_type = "DEBIT" if i % 3 == 0 else "CREDIT"
+            amt = (i + 1) * 250000
+            txs.append((
+                f"TXN-{uuid.uuid4().hex[:8].upper()}",
+                "client@kandjou.gn",
+                op,
+                tx_type,
+                amt,
+                f"Transaction test {i+1}",
+                "SUCCESS"
+            ))
+        cursor.executemany("""
+            INSERT INTO transactions (tx_id, client_id, operator, type, amount, description, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, txs)
     conn.commit()
     conn.close()
 

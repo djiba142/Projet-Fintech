@@ -12,12 +12,14 @@ import {
   MoreHorizontal
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 export default function AuditTransactions() {
   const { token } = useAuth();
+  const navigate = useNavigate();
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -148,7 +150,12 @@ export default function AuditTransactions() {
                 </td>
                 <td style={S.td}>
                    <div style={{ display: "flex", gap: 8 }}>
-                     <button style={S.iconBtn}><Eye size={16} /></button>
+                     <button 
+                        onClick={() => navigate(`/client-detail?id=${tx.client_id}`)}
+                        style={S.iconBtn}
+                      >
+                        <Eye size={16} />
+                      </button>
                      <button style={S.iconBtn}><ShieldAlert size={16} color="#DC2626" /></button>
                      <button style={S.iconBtn}><MoreHorizontal size={16} /></button>
                    </div>

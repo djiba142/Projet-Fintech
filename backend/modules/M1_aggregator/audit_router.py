@@ -28,7 +28,7 @@ async def get_audit_overview(token_data: Dict = Depends(require_valid_token)):
     cursor = conn.cursor()
     
     # KPIs
-    cursor.execute("SELECT COUNT(*) as count FROM audit_logs")
+    cursor.execute("SELECT COUNT(*) as count FROM transactions")
     total_tx_count = cursor.fetchone()['count']
     
     cursor.execute("SELECT COUNT(*) as count FROM audit_alerts WHERE status = 'OPEN'")
@@ -48,7 +48,7 @@ async def get_audit_overview(token_data: Dict = Depends(require_valid_token)):
     
     stats_tx = []
     for d in days:
-        cursor.execute("SELECT COUNT(*) as count FROM audit_logs WHERE timestamp LIKE ?", (f"{d}%",))
+        cursor.execute("SELECT COUNT(*) as count FROM transactions WHERE created_at LIKE ?", (f"{d}%",))
         stats_tx.append({"date": d, "count": cursor.fetchone()['count']})
 
     # Alertes récentes
@@ -78,30 +78,36 @@ async def get_audit_transactions(
     if token_data.get("role") != "Régulateur (BCRG)":
         raise HTTPException(status_code=403, detail="Accès réservé")
 
-    # On simule la récupération de TOUTES les transactions du système
-    # Dans un vrai système, on piocherait dans une vue matérialisée ou ElasticSearch
-    from modules.common.database import get_all_users
-    users = get_all_users()
+    conn = get_db_connection()
+    cursor = conn.cursor()
     
-    all_system_tx = []
-    for u in users:
-        if u['role'] == 'Client':
-            tx_data = await get_transactions_internal(u['username'])
-            all_system_tx.extend(tx_data.get("transactions", []))
+    query = "SELECT * FROM transactions WHERE amount >= ?"
+    params = [min_amount]
     
-    # Filtrage
-    if min_amount:
-        all_system_tx = [t for t in all_system_tx if t['amount'] >= min_amount]
     if operator:
-        all_system_tx = [t for t in all_system_tx if t['op'].upper() == operator.upper()]
+        query += " AND operator = ?"
+        params.append(operator.upper())
+    
+    query += " ORDER BY created_at DESC"
+    cursor.execute(query, params)
+    rows = cursor.fetchall()
+    conn.close()
 
-    # Scoring Fraude Basique (AML)
-    for t in all_system_tx:
+    all_system_tx = []
+    for r in rows:
+        t = dict(r)
+        # On mappe les noms de colonnes pour la compatibilité frontend
+        t['op'] = t['operator']
+        t['date'] = t['created_at']
+        t['desc'] = t['description']
+        
+        # Scoring Fraude Basique (AML)
         score = 0
         if t['amount'] > 1000000: score += 40
         if t['status'] != 'SUCCESS': score += 10
         t['fraud_score'] = score
         t['risk_level'] = "HIGH" if score >= 40 else "MEDIUM" if score >= 20 else "LOW"
+        all_system_tx.append(t)
 
     return all_system_tx
 

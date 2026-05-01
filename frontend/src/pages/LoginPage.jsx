@@ -169,7 +169,7 @@ const CSS = `
 `;
 
 const S = {
-  page: { display: "flex", height: "100vh", background: "#fff", overflow: "hidden" },
+  page: { display: "flex", minHeight: "100vh", background: "#fff" },
   
   visualSide: { 
     flex: 1.2, 
@@ -179,31 +179,32 @@ const S = {
     position: "relative",
     display: "flex",
     flexDirection: "column",
-    padding: "2.5rem",
+    padding: "4rem",
+    "@media (max-width: 1024px)": { display: "none" }
   },
-  overlay: { position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,30,16,0.85), rgba(0,40,20,0.95))" },
+  overlay: { position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,0.2), rgba(0,61,32,0.85))" },
   visualContent: { position: "relative", zIndex: 1, height: "100%", display: "flex", flexDirection: "column" },
-  logoVisual: { height: 45, width: "fit-content", objectFit: "contain" },
-  visualTitle: { color: "#fff", fontSize: "2.5rem", fontWeight: 950, letterSpacing: -1.5, lineHeight: 1.1, marginBottom: "1rem" },
-  visualText: { color: "rgba(255,255,255,0.7)", fontSize: "0.9rem", fontWeight: 500, lineHeight: 1.5, maxWidth: 420 },
-  visualStats: { display: "flex", gap: "2.5rem", marginTop: "2rem" },
-  vStatVal: { color: "#fff", fontSize: "1.5rem", fontWeight: 900 },
-  vStatLab: { color: "rgba(255,255,255,0.5)", fontSize: "0.7rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 },
+  logoVisual: { height: 60, width: "fit-content", objectFit: "contain", filter: "brightness(0) invert(1)" },
+  visualTitle: { color: "#fff", fontSize: "3.5rem", fontWeight: 950, letterSpacing: -2, lineHeight: 1.1, marginBottom: "1.5rem" },
+  visualText: { color: "rgba(255,255,255,0.8)", fontSize: "1.1rem", fontWeight: 500, lineHeight: 1.6, maxWidth: 500 },
+  visualStats: { display: "flex", gap: "3rem", marginTop: "3rem" },
+  vStatVal: { color: "#fff", fontSize: "1.8rem", fontWeight: 900 },
+  vStatLab: { color: "rgba(255,255,255,0.6)", fontSize: "0.8rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 },
 
   formSide: { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", background: "#F8FAFC" },
-  formScroll: { width: "100%", maxWidth: 440, padding: "1.5rem" },
-  formCard: { background: "#fff", padding: "2rem", borderRadius: 28, boxShadow: "0 15px 40px rgba(0,0,0,0.04)", border: "1px solid #E2E8F0" },
-  mobileLogo: { height: 40, marginBottom: "2rem", display: "none" },
-  formTitle: { fontSize: "1.5rem", fontWeight: 950, color: "#0F172A", margin: 0, letterSpacing: -0.8 },
-  formSubtitle: { fontSize: "0.8rem", color: "#64748B", fontWeight: 600, marginTop: 6 },
-  formLogo: { height: 40, marginBottom: "1rem", display: "block" },
+  formScroll: { width: "100%", maxWidth: 500, padding: "2rem" },
+  formCard: { background: "#fff", padding: "3rem", borderRadius: 32, boxShadow: "0 20px 50px rgba(0,0,0,0.04)", border: "1px solid #E2E8F0" },
+  mobileLogo: { height: 40, marginBottom: "2rem", display: "none", "@media (max-width: 1024px)": { display: "block" } },
+  formTitle: { fontSize: "1.8rem", fontWeight: 950, color: "#0F172A", margin: 0, letterSpacing: -1 },
+  formSubtitle: { fontSize: "0.9rem", color: "#64748B", fontWeight: 600, marginTop: 8 },
+  formLogo: { height: 50, marginBottom: "1.5rem", display: "block" },
 
-  form: { display: "flex", flexDirection: "column", gap: "1rem" },
-  inputGroup: { display: "flex", flexDirection: "column", gap: 6 },
-  label: { fontSize: "0.7rem", fontWeight: 800, color: "#475569", textTransform: "uppercase", letterSpacing: 0.5 },
+  form: { display: "flex", flexDirection: "column", gap: "1.5rem" },
+  inputGroup: { display: "flex", flexDirection: "column", gap: 8 },
+  label: { fontSize: "0.75rem", fontWeight: 800, color: "#475569", textTransform: "uppercase", letterSpacing: 0.5 },
   inputWrap: { position: "relative" },
-  inputIcon: { position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "#94A3B8" },
-  input: { width: "100%", padding: "12px 12px 12px 44px", borderRadius: 12, border: "2px solid #F1F5F9", background: "#F8FAFC", fontSize: "0.9rem", fontWeight: 600, transition: "0.2s" },
+  inputIcon: { position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "#94A3B8" },
+  input: { width: "100%", padding: "14px 14px 14px 48px", borderRadius: 14, border: "2px solid #F1F5F9", background: "#F8FAFC", fontSize: "1rem", fontWeight: 600, transition: "0.2s" },
   eyeBtn: { position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#94A3B8", cursor: "pointer" },
 
   options: { display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.85rem" },
@@ -212,14 +213,14 @@ const S = {
 
   error: { padding: "12px", background: "#FEF2F2", borderRadius: 12, color: "#DC2626", fontSize: "0.85rem", fontWeight: 700, display: "flex", alignItems: "center", gap: 10 },
   submitBtn: { 
-    width: "100%", padding: "0.9rem", borderRadius: 14, border: "none", 
+    width: "100%", padding: "1.1rem", borderRadius: 16, border: "none", 
     background: "linear-gradient(135deg, #006233 0%, #004D28 100%)", color: "#fff", 
-    fontSize: "0.9rem", fontWeight: 900, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-    boxShadow: "0 8px 20px rgba(0,98,51,0.2)", transition: "0.2s"
+    fontSize: "1rem", fontWeight: 900, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+    boxShadow: "0 10px 25px rgba(0,98,51,0.2)", transition: "0.2s"
   },
 
-  footer: { marginTop: "1.5rem", textAlign: "center" },
-  noAccount: { fontSize: "0.8rem", color: "#64748B", fontWeight: 600 },
+  footer: { marginTop: "2.5rem", textAlign: "center" },
+  noAccount: { fontSize: "0.9rem", color: "#64748B", fontWeight: 600 },
   regLink: { background: "none", border: "none", color: "#006233", fontWeight: 900, cursor: "pointer", textDecoration: "underline" },
   secBadge: { marginTop: "1.5rem", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: "0.7rem", fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" }
 };
