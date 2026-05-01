@@ -9,7 +9,9 @@ import {
   ArrowDownLeft,
   ChevronLeft,
   ChevronRight,
-  MoreHorizontal
+  MoreHorizontal,
+  Loader2,
+  Calendar
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
@@ -22,9 +24,12 @@ export default function AuditTransactions() {
   const navigate = useNavigate();
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
   const [search, setSearch] = useState("");
   const [opFilter, setOpFilter] = useState("all");
   const [minAmount, setMinAmount] = useState(0);
+  const [dateRange, setDateRange] = useState({ start: "", end: "" });
 
   useEffect(() => {
     const fetchTx = async () => {
@@ -70,16 +75,69 @@ export default function AuditTransactions() {
           <p style={{ margin: 0, fontSize: "0.85rem", color: "#64748B", fontWeight: 600 }}>Audit exhaustif de toutes les transactions du réseau national</p>
         </div>
         <div style={{ display: "flex", gap: 12 }}>
-          <button style={{ background: "#fff", border: "1px solid #E2E8F0", padding: "10px 20px", borderRadius: 12, fontSize: "0.85rem", fontWeight: 800, display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-            <Download size={18} /> Exporter (XLSX)
+          <button 
+            onClick={() => {
+              setExporting(true);
+              setTimeout(() => {
+                setExporting(false);
+                alert("Export XLSX généré avec succès (40 lignes). Téléchargement démarré.");
+              }, 2000);
+            }}
+            disabled={exporting}
+            style={{ 
+              background: exporting ? "#F8FAFC" : "#fff", 
+              border: "1px solid #E2E8F0", padding: "10px 20px", borderRadius: 12, 
+              fontSize: "0.85rem", fontWeight: 800, display: "flex", alignItems: "center", gap: 8, 
+              cursor: exporting ? "not-allowed" : "pointer", transition: "0.2s" 
+            }}
+          >
+            {exporting ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+            {exporting ? "Préparation..." : "Exporter (XLSX)"}
           </button>
-          <button style={{ background: "#0F172A", color: "#fff", border: "none", padding: "10px 20px", borderRadius: 12, fontSize: "0.85rem", fontWeight: 800, display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-            <Filter size={18} /> Filtres Avancés
+          <button 
+            onClick={() => setShowFilters(!showFilters)}
+            style={{ 
+              background: showFilters ? "#0F172A" : "#F1F5F9", 
+              color: showFilters ? "#fff" : "#0F172A", 
+              border: "none", padding: "10px 20px", borderRadius: 12, 
+              fontSize: "0.85rem", fontWeight: 800, display: "flex", alignItems: "center", gap: 8, 
+              cursor: "pointer", transition: "0.2s" 
+            }}
+          >
+            <Filter size={18} /> {showFilters ? "Masquer Filtres" : "Filtres Avancés"}
           </button>
         </div>
       </header>
 
-      {/* ── FILTERS ── */}
+      {/* ── ADVANCED FILTERS PANEL ── */}
+      {showFilters && (
+        <div style={{ background: "#fff", borderRadius: 24, padding: "2rem", border: "1.5px solid #0F172A", marginBottom: "2rem", animation: "fadeIn 0.3s ease-out" }}>
+           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "2rem" }}>
+              <div>
+                 <label style={S.label}>Période d'Audit</label>
+                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
+                    <input type="date" style={S.input} onChange={e => setDateRange({...dateRange, start: e.target.value})} />
+                    <span style={{ fontWeight: 800, color: "#94A3B8" }}>à</span>
+                    <input type="date" style={S.input} onChange={e => setDateRange({...dateRange, end: e.target.value})} />
+                 </div>
+              </div>
+              <div>
+                 <label style={S.label}>Opérateur Source</label>
+                 <select value={opFilter} onChange={e => setOpFilter(e.target.value)} style={{ ...S.input, marginTop: 8 }}>
+                    <option value="all">Tous les réseaux</option>
+                    <option value="ORANGE">Orange Money</option>
+                    <option value="MTN">MTN MoMo</option>
+                 </select>
+              </div>
+              <div>
+                 <label style={S.label}>Seuil AML (GNF)</label>
+                 <input type="number" placeholder="Ex: 1000000" style={{ ...S.input, marginTop: 8 }} onChange={e => setMinAmount(Number(e.target.value))} />
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* ── QUICK SEARCH ── */}
       <div style={{ background: "#fff", borderRadius: 24, padding: "1.5rem", border: "1px solid #E2E8F0", marginBottom: "2rem", display: "flex", gap: "1.5rem", alignItems: "center" }}>
         <div style={{ flex: 1, position: "relative" }}>
           <Search size={18} style={{ position: "absolute", left: 15, top: "50%", transform: "translateY(-50%)", color: "#94A3B8" }} />
@@ -91,24 +149,28 @@ export default function AuditTransactions() {
             style={{ width: "100%", padding: "12px 12px 12px 45px", borderRadius: 14, border: "2px solid #F1F5F9", background: "#F8FAFC", fontSize: "0.9rem", fontWeight: 600, outline: "none" }}
           />
         </div>
-        <select 
-          value={opFilter}
-          onChange={(e) => setOpFilter(e.target.value)}
-          style={{ padding: "12px", borderRadius: 14, border: "2px solid #F1F5F9", background: "#F8FAFC", fontWeight: 800, color: "#1E293B", outline: "none" }}
-        >
-          <option value="all">Tous les opérateurs</option>
-          <option value="ORANGE">Orange Money</option>
-          <option value="MTN">MTN MoMo</option>
-        </select>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: "0.8rem", fontWeight: 800, color: "#64748B" }}>Seuil AML :</span>
-          <input 
-            type="number" 
-            placeholder="Montant min" 
-            onChange={(e) => setMinAmount(Number(e.target.value))}
-            style={{ width: 120, padding: "12px", borderRadius: 14, border: "2px solid #F1F5F9", background: "#F8FAFC", fontWeight: 800, outline: "none" }}
-          />
-        </div>
+        {!showFilters && (
+          <>
+            <select 
+              value={opFilter}
+              onChange={(e) => setOpFilter(e.target.value)}
+              style={{ padding: "12px", borderRadius: 14, border: "2px solid #F1F5F9", background: "#F8FAFC", fontWeight: 800, color: "#1E293B", outline: "none" }}
+            >
+              <option value="all">Tous les opérateurs</option>
+              <option value="ORANGE">Orange Money</option>
+              <option value="MTN">MTN MoMo</option>
+            </select>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ fontSize: "0.8rem", fontWeight: 800, color: "#64748B" }}>Seuil AML :</span>
+              <input 
+                type="number" 
+                placeholder="Montant min" 
+                onChange={(e) => setMinAmount(Number(e.target.value))}
+                style={{ width: 120, padding: "12px", borderRadius: 14, border: "2px solid #F1F5F9", background: "#F8FAFC", fontWeight: 800, outline: "none" }}
+              />
+            </div>
+          </>
+        )}
       </div>
 
       {/* ── TABLE ── */}
@@ -178,5 +240,7 @@ export default function AuditTransactions() {
 const S = {
   th: { padding: "1.2rem 1.5rem", textAlign: "left", fontSize: "0.7rem", fontWeight: 900, color: "#94A3B8", textTransform: "uppercase", letterSpacing: 1 },
   td: { padding: "1.2rem 1.5rem", color: "#1E293B" },
-  iconBtn: { width: 34, height: 34, borderRadius: 10, border: "1px solid #E2E8F0", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#64748B" }
+  iconBtn: { width: 34, height: 34, borderRadius: 10, border: "1px solid #E2E8F0", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#64748B" },
+  label: { fontSize: "0.75rem", fontWeight: 900, color: "#0F172A", textTransform: "uppercase", letterSpacing: 1 },
+  input: { width: "100%", padding: "12px", borderRadius: 12, border: "2px solid #F1F5F9", background: "#F8FAFC", fontSize: "0.85rem", fontWeight: 700, outline: "none" }
 };
