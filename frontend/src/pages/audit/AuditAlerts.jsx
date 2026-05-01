@@ -119,7 +119,7 @@ export default function AuditAlerts() {
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 5 }}>
                    <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 900, color: "#1E293B" }}>{alert.type}</h3>
-                   <span style={{ fontSize: "0.6rem", fontWeight: 950, padding: "2px 8px", borderRadius: 6, background: "#0F172A", color: "#fff" }}>#{alert.tx_id.slice(0, 8)}</span>
+                   <span style={{ fontSize: "0.6rem", fontWeight: 950, padding: "2px 8px", borderRadius: 6, background: "#0F172A", color: "#fff" }}>#{alert.tx_id ? alert.tx_id.slice(0, 8) : 'N/A'}</span>
                 </div>
                 <p style={{ margin: "5px 0", fontSize: "0.85rem", color: "#64748B", fontWeight: 600 }}>{alert.details}</p>
                 <div style={{ display: "flex", gap: 15, marginTop: 12 }}>

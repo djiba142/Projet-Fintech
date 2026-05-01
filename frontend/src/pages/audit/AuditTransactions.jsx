@@ -130,7 +130,7 @@ export default function AuditTransactions() {
             ) : filtered.map((tx, idx) => (
               <tr key={idx} style={{ borderBottom: "1px solid #F1F5F9" }}>
                 <td style={S.td}>
-                  <p style={{ margin: 0, fontWeight: 800, fontSize: "0.85rem" }}>{tx.id.slice(0, 8)}...</p>
+                  <p style={{ margin: 0, fontWeight: 800, fontSize: "0.85rem" }}>{tx.tx_id || `ID-${tx.id}`}</p>
                   <p style={{ margin: 0, fontSize: "0.7rem", color: "#94A3B8", fontWeight: 600 }}>{new Date(tx.date).toLocaleString()}</p>
                 </td>
                 <td style={S.td}>

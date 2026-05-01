@@ -87,8 +87,8 @@ export default function AuditDashboard() {
 
       {/* ── KPIS ── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "1.5rem", marginBottom: "2.5rem" }}>
-        <StatCard title="Transactions Totales" value={data?.kpis.total_transactions.toLocaleString()} icon={<Activity color="#3B82F6" />} trend={12.4} color="#3B82F6" />
-        <StatCard title="Volume de Flux (GNF)" value={data?.kpis.total_volume.toLocaleString()} icon={<BarChart3 color="#8B5CF6" />} trend={8.1} color="#8B5CF6" />
+        <StatCard title="Transactions Totales" value={data?.kpis?.total_transactions?.toLocaleString() || "0"} icon={<Activity color="#3B82F6" />} trend={12.4} color="#3B82F6" />
+        <StatCard title="Volume de Flux (GNF)" value={data?.kpis?.total_volume?.toLocaleString() || "0"} icon={<BarChart3 color="#8B5CF6" />} trend={8.1} color="#8B5CF6" />
         <StatCard title="Institutions Sous Surveillance" value={data?.kpis.active_institutions} icon={<Building2 color="#10B981" />} trend={0} color="#10B981" />
         <StatCard title="Alertes AML Ouvertes" value={data?.kpis.open_alerts} icon={<AlertTriangle color="#EF4444" />} trend={-4.2} color="#EF4444" />
       </div>
