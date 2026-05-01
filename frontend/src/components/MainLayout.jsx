@@ -12,7 +12,9 @@ import {
   X,
   AlertTriangle,
   Users,
-  Activity
+  Activity,
+  Building2,
+  ShieldAlert
 } from "lucide-react";
 
 import { useAuth } from "../context/AuthContext";
@@ -71,12 +73,14 @@ export default function MainLayout({ children }) {
       ];
     }
 
-    // Menu Régulateur BCRG (6 Nav)
+    // Menu Régulateur BCRG (Centre de Contrôle National)
     if (role === "Régulateur (BCRG)") {
       return [
-        { path: "/audit", label: "Conformité", icon: ShieldCheck },
-        { path: "/audit", label: "Surveillance", icon: Activity },
-        { path: "/audit", label: "Audit & Logs", icon: FileText },
+        { path: "/audit", label: "Supervision", icon: Home },
+        { path: "/audit-transactions", label: "Flux & Audit", icon: Activity },
+        { path: "/audit-alerts", label: "Alertes AML", icon: ShieldAlert },
+        { path: "/audit-institutions", label: "Institutions", icon: Building2 },
+        { path: "/audit-reports", label: "Rapports", icon: FileText },
         { path: "/profile", label: "Profil Officiel", icon: User },
       ];
     }
@@ -90,6 +94,7 @@ export default function MainLayout({ children }) {
   const getSidebarBg = () => {
     if (role === "Client") return "#006233"; // Exact mockup Green
     if (role === "Administrateur") return "#1E293B";
+    if (role === "Régulateur (BCRG)") return "#0F172A"; // Authority Navy
     return "#004d28";
   };
 

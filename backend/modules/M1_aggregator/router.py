@@ -608,6 +608,10 @@ async def simulate_transfer_process(tx_id: str, req: UnifiedTransferRequest, use
                     "interoperability": result["interoperability"]
                 }
             })
+            
+            # Déclencher le contrôle AML pour le Régulateur
+            from .audit_router import trigger_aml_check
+            trigger_aml_check(tx_id, username, req.amount, f"Transfert {req.operator} vers {req.to_msisdn}")
         except Exception as e:
             logger.error(f"Erreur M2 Mutation: {e}")
             TRANSFER_STATUS[tx_id].update({"status": "FAILED", "message": str(e), "progress": 100})

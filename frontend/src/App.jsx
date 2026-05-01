@@ -12,7 +12,11 @@ import AgentDashboard   from "./pages/AgentDashboard";
 import ClientDetailPage from "./pages/ClientDetailPage";
 import AdminDashboard   from "./pages/AdminDashboard";
 import RiskDashboard    from "./pages/RiskDashboard";
-import AuditPage        from "./pages/AuditPage";
+import AuditDashboard from "./pages/audit/AuditDashboard";
+import AuditTransactions from "./pages/audit/AuditTransactions";
+import AuditAlerts from "./pages/audit/AuditAlerts";
+import AuditInstitutions from "./pages/audit/AuditInstitutions";
+import AuditReports from "./pages/audit/AuditReports";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import MainLayout from "./components/MainLayout";
 import "./App.css";
@@ -116,8 +120,28 @@ export default function App() {
 
           {/* Accès Régulateur BCRG */}
           <Route path="/audit" element={
-            <LayoutRoute allowedRoles={["Administrateur", "Analyste Risque", "Régulateur (BCRG)"]}>
-              <AuditPage />
+            <LayoutRoute allowedRoles={["Régulateur (BCRG)", "Administrateur"]}>
+              <AuditDashboard />
+            </LayoutRoute>
+          } />
+          <Route path="/audit-transactions" element={
+            <LayoutRoute allowedRoles={["Régulateur (BCRG)", "Administrateur"]}>
+              <AuditTransactions />
+            </LayoutRoute>
+          } />
+          <Route path="/audit-alerts" element={
+            <LayoutRoute allowedRoles={["Régulateur (BCRG)", "Administrateur"]}>
+              <AuditAlerts />
+            </LayoutRoute>
+          } />
+          <Route path="/audit-institutions" element={
+            <LayoutRoute allowedRoles={["Régulateur (BCRG)", "Administrateur"]}>
+              <AuditInstitutions />
+            </LayoutRoute>
+          } />
+          <Route path="/audit-reports" element={
+            <LayoutRoute allowedRoles={["Régulateur (BCRG)", "Administrateur"]}>
+              <AuditReports />
             </LayoutRoute>
           } />
 

@@ -69,6 +69,33 @@ def init_db():
         )
     """)
     
+    # Table des alertes de fraude (AML)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS audit_alerts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tx_id VARCHAR(100),
+            client_id VARCHAR(190),
+            type VARCHAR(100), -- LARGE_AMOUNT, FREQUENCY, SUSPICIOUS_DESTINATION
+            severity VARCHAR(20), -- HIGH, MEDIUM, LOW
+            status VARCHAR(20) DEFAULT 'OPEN', -- OPEN, INVESTIGATING, CLOSED
+            details TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Table des institutions surveillées
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS institutions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name VARCHAR(100) UNIQUE,
+            type VARCHAR(50), -- TELCO, BANK, MFI
+            api_status VARCHAR(20) DEFAULT 'ONLINE',
+            uptime_score DECIMAL(5,2) DEFAULT 99.9,
+            total_volume DECIMAL(15,2) DEFAULT 0,
+            last_ping TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    
     # Table de configuration globale
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS system_config (
@@ -107,13 +134,21 @@ def init_db():
         ]
         cursor.executemany("INSERT INTO users (username, password, role, fullname, email, msisdn_orange, msisdn_mtn, language, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", default_users)
         
-    # Default dossiers
-    cursor.execute("SELECT COUNT(*) FROM loan_dossiers")
-    if cursor.fetchone()[0] == 0:
         cursor.execute("""
             INSERT INTO loan_dossiers (client_id, agent_id, score, amount, status)
             VALUES ('client@kandjou.gn', 'agent@kandjou.gn', 72, 15000000, 'PENDING')
         """)
+
+    # Default Institutions
+    cursor.execute("SELECT COUNT(*) FROM institutions")
+    if cursor.fetchone()[0] == 0:
+        insts = [
+            ("ORANGE MONEY", "TELCO", "ONLINE", 99.8, 450000000),
+            ("MTN MOMO", "TELCO", "ONLINE", 99.5, 320000000),
+            ("VISTA BANK", "BANK", "ONLINE", 99.9, 1200000000),
+            ("ECOBANK", "BANK", "MAINTENANCE", 94.2, 850000000)
+        ]
+        cursor.executemany("INSERT INTO institutions (name, type, api_status, uptime_score, total_volume) VALUES (?, ?, ?, ?, ?)", insts)
         
     conn.commit()
     conn.close()
