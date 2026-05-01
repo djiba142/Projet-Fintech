@@ -18,6 +18,7 @@ import {
   Target,
   Terminal
 } from "lucide-react";
+import logoKandjou from "../assets/logo_kandjou.png";
 
 import { useAuth } from "../context/AuthContext";
 
@@ -119,7 +120,7 @@ export default function MainLayout({ children }) {
           navigate(dest); 
           setIsMobileMenuOpen(false); 
         }}>
-        <img src="/logo_kandjou.png" alt="Kandjou Logo" style={{ height: 48, objectFit: "contain" }} />
+        <img src={logoKandjou} alt="Kandjou Logo" style={{ height: 48, objectFit: "contain" }} />
         <span style={{ color: "#fff", marginLeft: 10, fontWeight: 900, fontSize: "1.2rem", letterSpacing: -0.5 }}>KANDJOU</span>
       </div>
 

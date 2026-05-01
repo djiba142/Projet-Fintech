@@ -13,6 +13,8 @@ import {
   AlertCircle,
   ChevronLeft
 } from "lucide-react";
+import logoKandjou from "../assets/logo_kandjou.png";
+import loginBg from "../assets/kandjou_login_bg.png";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -64,7 +66,7 @@ export default function LoginPage() {
       <div style={S.visualSide}>
          <div style={S.overlay} />
          <div style={S.visualContent}>
-            <img src="/logo_kandjou.png" alt="Kandjou" style={S.logoVisual} />
+            <img src={logoKandjou} alt="Kandjou" style={S.logoVisual} />
             <div style={{ marginTop: "auto" }}>
                <h1 style={S.visualTitle}>Le futur de la finance <br/>en Guinée est ici.</h1>
                <p style={S.visualText}>Gérez vos comptes Orange Money, MTN MoMo et vos crédits sur une plateforme unique, sécurisée et certifiée par la BCRG.</p>
@@ -87,7 +89,7 @@ export default function LoginPage() {
          <div style={S.formScroll}>
             <div style={S.formCard}>
                <div style={{ marginBottom: "2.5rem" }}>
-                  <img src="/logo_kandjou.png" alt="Logo" style={S.formLogo} />
+                  <img src={logoKandjou} alt="Logo" style={S.formLogo} />
                   <h2 style={S.formTitle}>Connexion Sécurisée</h2>
                   <p style={S.formSubtitle}>Saisissez vos identifiants pour accéder à votre espace.</p>
                </div>
@@ -171,7 +173,7 @@ const S = {
   
   visualSide: { 
     flex: 1.2, 
-    background: "url('/kandjou_login_bg.png')", 
+    background: `url(${loginBg})`, 
     backgroundSize: "cover", 
     backgroundPosition: "center",
     position: "relative",

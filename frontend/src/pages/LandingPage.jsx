@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../components/Header";
 import { translations } from "../i18n";
+import logoKandjou from "../assets/logo_kandjou.png";
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -187,7 +188,7 @@ export default function LandingPage() {
         <div style={s.footerMain}>
           <div style={s.fCol1}>
             <div style={s.logoWrap} onClick={() => navigate("/")}>
-              <img src="/logo_kandjou.png" alt="Kandjou Logo" style={s.logoImgFooter} />
+              <img src={logoKandjou} alt="Kandjou Logo" style={s.logoImgFooter} />
             </div>
             <p style={s.fDesc}>L'excellence financière pour chaque Guinéen.</p>
           </div>

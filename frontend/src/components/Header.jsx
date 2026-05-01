@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { translations } from "../i18n";
 import { useAuth } from "../context/AuthContext";
+import logoKandjou from "../assets/logo_kandjou.png";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -66,7 +67,7 @@ export default function Header() {
   return (
     <header style={s.header}>
       <div style={s.logoWrap} onClick={() => navigate("/")}>
-        <img src="/logo_kandjou.png" alt="Kandjou Logo" style={s.logoImg} />
+        <img src={logoKandjou} alt="Kandjou Logo" style={s.logoImg} />
       </div>
 
       <nav style={s.nav}>
