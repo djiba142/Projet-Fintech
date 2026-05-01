@@ -15,7 +15,10 @@ import {
   X,
   ShieldCheck,
   Server,
-  Database
+  Database,
+  Cpu,
+  Link2,
+  Lock
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import axios from "axios";
@@ -25,18 +28,19 @@ const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
 const LOGOS = {
   "Orange Money": "/orange.png",
   "MTN MoMo": "/mtn.png",
-  "Vista Bank": "https://img.icons8.com/color/96/bank.png", // Mock fallback for Vista
-  "Ecobank": "https://img.icons8.com/color/96/bank.png"    // Mock fallback for Ecobank
+  "Vista Bank": "https://img.icons8.com/color/96/bank.png", 
+  "Ecobank": "https://img.icons8.com/color/96/bank.png"
 };
 
 const S = {
   miniStat: { background: "#F8FAFC", padding: "1rem", borderRadius: 16, border: "1px solid #F1F5F9" },
   statLab: { margin: 0, fontSize: "0.65rem", fontWeight: 800, color: "#94A3B8", textTransform: "uppercase" },
   statVal: { margin: "4px 0 0", fontSize: "0.95rem", fontWeight: 900, color: "#1E293B" },
-  modalOverlay: { position: "fixed", inset: 0, background: "rgba(15, 23, 42, 0.6)", backdropFilter: "blur(4px)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" },
-  modalBox: { background: "#fff", width: "100%", maxWidth: 500, borderRadius: 32, padding: "2.5rem", boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)", position: "relative" },
-  input: { width: "100%", padding: "14px", borderRadius: 14, border: "2px solid #F1F5F9", background: "#F8FAFC", fontSize: "0.9rem", fontWeight: 700, outline: "none", marginTop: 8 },
-  label: { fontSize: "0.75rem", fontWeight: 900, color: "#64748B", textTransform: "uppercase", letterSpacing: 1 }
+  // Modal Style - Infrastructure Theme
+  modalOverlay: { position: "fixed", inset: 0, background: "rgba(15, 23, 42, 0.8)", backdropFilter: "blur(8px)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" },
+  modalBox: { background: "#1E293B", width: "100%", maxWidth: 550, borderRadius: 32, padding: "3rem", boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)", position: "relative", border: "1px solid rgba(255,255,255,0.1)" },
+  input: { width: "100%", padding: "14px", borderRadius: 14, border: "2px solid rgba(255,255,255,0.05)", background: "rgba(255,255,255,0.05)", fontSize: "0.9rem", fontWeight: 700, outline: "none", marginTop: 8, color: "#fff" },
+  label: { fontSize: "0.7rem", fontWeight: 900, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: 1.5 }
 };
 
 export default function AdminInstitutions() {
@@ -68,7 +72,7 @@ export default function AdminInstitutions() {
 
   const handleAdd = (e) => {
     e.preventDefault();
-    alert(`L'institution "${form.name}" a été intégrée avec succès au réseau Kandjou.`);
+    alert(`Configuration de la passerelle "${form.name}" enregistrée dans le cluster.`);
     setShowModal(false);
     setForm({ name: "", type: "BANK", endpoint: "", apiKey: "" });
     fetchInst();
@@ -121,18 +125,8 @@ export default function AdminInstitutions() {
                     </div>
                  </div>
                  <div style={{ display: "flex", gap: 8 }}>
-                    <button 
-                      onClick={() => alert(`Accès aux logs techniques de ${inst.name}`)}
-                      style={{ width: 36, height: 36, borderRadius: 10, background: "#F8FAFC", border: "1px solid #E2E8F0", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748B", cursor: "pointer" }}
-                    >
-                       <Activity size={16} />
-                    </button>
-                    <button 
-                      onClick={() => alert(`Accès au monitoring externe de ${inst.name}...`)}
-                      style={{ width: 36, height: 36, borderRadius: 10, background: "#F8FAFC", border: "1px solid #E2E8F0", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748B", cursor: "pointer" }}
-                    >
-                      <ExternalLink size={16} />
-                    </button>
+                    <button onClick={() => alert(`Logs de ${inst.name}`)} style={S.iconBtn}><Activity size={16} /></button>
+                    <button onClick={() => alert(`Monitoring de ${inst.name}`)} style={S.iconBtn}><ExternalLink size={16} /></button>
                  </div>
               </div>
 
@@ -160,27 +154,14 @@ export default function AdminInstitutions() {
                        <span style={S.statVal}>{inst.success_rate}</span>
                     </div>
                     <div style={{ width: "100%", height: 8, background: "#F1F5F9", borderRadius: 10, overflow: "hidden" }}>
-                       <div style={{ width: inst.success_rate, height: "100%", background: "#10B981", transition: "width 0.5s ease-out" }} />
+                       <div style={{ width: inst.success_rate, height: "100%", background: "#10B981" }} />
                     </div>
-                 </div>
-              </div>
-
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.5rem" }}>
-                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <Server size={14} color="#94A3B8" />
-                    <span style={{ fontSize: "0.7rem", fontWeight: 700, color: "#94A3B8" }}>Dernier Sync: {new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
-                 </div>
-                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <Database size={14} color="#94A3B8" />
-                    <span style={{ fontSize: "0.7rem", fontWeight: 700, color: "#94A3B8" }}>Certifié BCRG</span>
                  </div>
               </div>
 
               <button 
                 onClick={() => alert(`Configuration technique pour ${inst.name} activée.`)}
-                style={{ width: "100%", padding: "12px", borderRadius: 14, border: "1.5px solid #F1F5F9", background: "#fff", color: "#1E293B", fontSize: "0.85rem", fontWeight: 900, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, transition: "0.2s" }}
-                onMouseOver={e => e.currentTarget.style.background = "#F8FAFC"}
-                onMouseOut={e => e.currentTarget.style.background = "#fff"}
+                style={{ width: "100%", padding: "12px", borderRadius: 14, border: "1.5px solid #F1F5F9", background: "#fff", color: "#1E293B", fontSize: "0.85rem", fontWeight: 900, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
               >
                  <Settings size={18} /> Configurer l'API
               </button>
@@ -188,67 +169,72 @@ export default function AdminInstitutions() {
          ))}
       </div>
 
-      {/* ── ADD INSTITUTION MODAL ── */}
+      {/* ── ADD INSTITUTION MODAL (Infrastructure Theme) ── */}
       {showModal && (
         <div style={S.modalOverlay}>
           <div style={S.modalBox}>
-            <button onClick={() => setShowModal(false)} style={{ position: "absolute", top: 20, right: 20, background: "none", border: "none", color: "#64748B", cursor: "pointer" }}>
-               <X size={24} />
+            <button onClick={() => setShowModal(false)} style={{ position: "absolute", top: 25, right: 25, background: "rgba(255,255,255,0.05)", border: "none", borderRadius: "50%", width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#fff" }}>
+               <X size={20} />
             </button>
-            <h2 style={{ fontSize: "1.5rem", fontWeight: 950, color: "#0F172A", marginBottom: "1.5rem" }}>Nouvelle Institution</h2>
             
-            <form onSubmit={handleAdd} style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
-               <div>
-                  <label style={S.label}>Nom de l'Institution</label>
-                  <input 
-                    required 
-                    type="text" 
-                    placeholder="Ex: Banque Centrale, Orange..." 
-                    style={S.input}
-                    value={form.name}
-                    onChange={e => setForm({...form, name: e.target.value})}
-                  />
+            <div style={{ display: "flex", alignItems: "center", gap: 15, marginBottom: "2rem" }}>
+               <div style={{ width: 50, height: 50, borderRadius: 16, background: "rgba(59, 130, 246, 0.2)", display: "flex", alignItems: "center", justifyContent: "center", color: "#3B82F6" }}>
+                  <Server size={28} />
                </div>
                <div>
-                  <label style={S.label}>Type de Partenaire</label>
-                  <select style={S.input} value={form.type} onChange={e => setForm({...form, type: e.target.value})}>
-                     <option value="BANK">Banque Commerciale</option>
-                     <option value="TELCO">Opérateur Télécom (Mobile Money)</option>
-                     <option value="FINTECH">Partenaire FinTech</option>
-                  </select>
+                  <h2 style={{ fontSize: "1.5rem", fontWeight: 950, color: "#fff", margin: 0 }}>Ajout Institution</h2>
+                  <p style={{ margin: 0, fontSize: "0.75rem", color: "rgba(255,255,255,0.4)", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>Configuration de passerelle technique</p>
                </div>
+            </div>
+            
+            <form onSubmit={handleAdd} style={{ display: "flex", flexDirection: "column", gap: "1.8rem" }}>
+               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
+                  <div>
+                     <label style={S.label}>Nom Partenaire</label>
+                     <div style={{ position: "relative" }}>
+                        <Building2 size={16} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "rgba(255,255,255,0.2)" }} />
+                        <input required style={{ ...S.input, paddingLeft: "42px" }} placeholder="Ex: Vista, Orange..." value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
+                     </div>
+                  </div>
+                  <div>
+                     <label style={S.label}>Type Infrastructure</label>
+                     <div style={{ position: "relative" }}>
+                        <Cpu size={16} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "rgba(255,255,255,0.2)" }} />
+                        <select style={{ ...S.input, paddingLeft: "42px" }} value={form.type} onChange={e => setForm({...form, type: e.target.value})}>
+                           <option value="BANK">Banque Commerciale</option>
+                           <option value="TELCO">Opérateur Mobile Money</option>
+                           <option value="FINTECH">Solution FinTech</option>
+                        </select>
+                     </div>
+                  </div>
+               </div>
+
                <div>
                   <label style={S.label}>Endpoint API de Connexion</label>
-                  <input 
-                    required 
-                    type="url" 
-                    placeholder="https://api.institution.gn/v1" 
-                    style={S.input}
-                    value={form.endpoint}
-                    onChange={e => setForm({...form, endpoint: e.target.value})}
-                  />
+                  <div style={{ position: "relative" }}>
+                     <Link2 size={16} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "rgba(255,255,255,0.2)" }} />
+                     <input required type="url" style={{ ...S.input, paddingLeft: "42px" }} placeholder="https://api.gateway.gn/v1" value={form.endpoint} onChange={e => setForm({...form, endpoint: e.target.value})} />
+                  </div>
                </div>
+
                <div>
-                  <label style={S.label}>Clé API / Secret de Certification</label>
-                  <input 
-                    required 
-                    type="password" 
-                    placeholder="••••••••••••••••" 
-                    style={S.input}
-                    value={form.apiKey}
-                    onChange={e => setForm({...form, apiKey: e.target.value})}
-                  />
+                  <label style={S.label}>Secret de Certification (API Key)</label>
+                  <div style={{ position: "relative" }}>
+                     <Lock size={16} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "rgba(255,255,255,0.2)" }} />
+                     <input required type="password" style={{ ...S.input, paddingLeft: "42px" }} placeholder="••••••••••••••••" value={form.apiKey} onChange={e => setForm({...form, apiKey: e.target.value})} />
+                  </div>
                </div>
                
                <button 
                  type="submit"
                  style={{ 
-                   marginTop: "1rem", padding: "14px", borderRadius: 14, 
-                   background: "#0F172A", color: "#fff", border: "none", 
-                   fontWeight: 900, fontSize: "0.9rem", cursor: "pointer" 
+                   marginTop: "1rem", padding: "16px", borderRadius: 16, 
+                   background: "#3B82F6", color: "#fff", border: "none", 
+                   fontWeight: 950, fontSize: "0.95rem", cursor: "pointer",
+                   boxShadow: "0 10px 20px rgba(59, 130, 246, 0.3)"
                  }}
                >
-                 Enregistrer l'institution
+                 Déployer la passerelle
                </button>
             </form>
           </div>
@@ -258,3 +244,5 @@ export default function AdminInstitutions() {
     </div>
   );
 }
+
+const iconBtn = { width: 36, height: 36, borderRadius: 10, background: "#F8FAFC", border: "1px solid #E2E8F0", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748B", cursor: "pointer" };
