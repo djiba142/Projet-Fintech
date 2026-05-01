@@ -17,6 +17,7 @@ import AdminSettings from "./pages/admin/AdminSettings";
 import AdminRoles from "./pages/admin/AdminRoles";
 import AdminInstitutions from "./pages/admin/AdminInstitutions";
 import AdminTransactions from "./pages/admin/AdminTransactions";
+import AdminSimulation from "./pages/admin/AdminSimulation";
 import RiskDashboard    from "./pages/risk/RiskDashboard";
 import AuditDashboard from "./pages/audit/AuditDashboard";
 import AuditTransactions from "./pages/audit/AuditTransactions";
@@ -146,6 +147,12 @@ export default function App() {
           <Route path="/admin-transactions" element={
             <LayoutRoute allowedRoles={["Administrateur"]}>
               <AdminTransactions />
+            </LayoutRoute>
+          } />
+
+          <Route path="/admin-simulation" element={
+            <LayoutRoute allowedRoles={["Administrateur"]}>
+              <AdminSimulation />
             </LayoutRoute>
           } />
 

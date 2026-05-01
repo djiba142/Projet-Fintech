@@ -17,7 +17,8 @@ import {
   ShieldAlert,
   Target,
   Terminal,
-  Settings
+  Settings,
+  Zap
 } from "lucide-react";
 import logoKandjou from "../assets/logo_kandjou.png";
 
@@ -66,6 +67,7 @@ export default function MainLayout({ children }) {
         { path: "/admin-users", label: "Utilisateurs", icon: Users },
         { path: "/admin-roles", label: "Rôles & Accès", icon: ShieldCheck },
         { path: "/admin-institutions", label: "Institutions & APIs", icon: Building2 },
+        { path: "/admin-simulation", label: "Simulation Flux", icon: Zap },
         { path: "/admin-transactions", label: "Transactions", icon: Activity },
         { path: "/admin-logs", label: "Logs d'Audit", icon: Terminal },
         { path: "/admin-settings", label: "Configuration", icon: Settings },
