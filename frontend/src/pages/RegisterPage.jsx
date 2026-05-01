@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import logoKandjou from "../assets/logo_kandjou.png";
 import brandingImg from "../assets/register_branding.png";
 import { translations } from "../i18n";
 
@@ -37,7 +38,7 @@ export default function RegisterPage() {
       <div style={s.left}>
         <div style={s.leftContent}>
           <div style={s.logoWrap} onClick={() => navigate("/")}>
-            <img src="/logo_kandjou.png" alt="Kandjou Logo" style={{ ...s.logoImg, filter: "brightness(0) invert(1)" }} />
+            <img src={logoKandjou} alt="Kandjou Logo" style={{ ...s.logoImg, filter: "brightness(0) invert(1)" }} />
           </div>
 
           <div style={s.brandingInfo}>
@@ -68,7 +69,8 @@ export default function RegisterPage() {
         <div style={s.formWrapper}>
           
           <div style={s.formHeader}>
-            <h2 style={s.formH2}>{t.register}</h2>
+            <img src={logoKandjou} alt="Kandjou" style={{ height: 45, marginBottom: "1.5rem" }} />
+            <h2 style={s.formH2}>Créer un compte</h2>
             <p style={s.formP}>Étape {step} sur 3 — {step === 1 ? t.step1 : step === 2 ? t.step2 : t.step3}</p>
           </div>
 

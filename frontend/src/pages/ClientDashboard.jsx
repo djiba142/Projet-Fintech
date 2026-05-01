@@ -19,6 +19,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import useTransactionsSocket from "../hooks/useTransactionsSocket";
 import axios from "axios";
+import logoKandjou from "../assets/logo_kandjou.png";
 
 // Import des nouveaux composants Chart.js Pro
 import TransactionsChart from "../components/charts/TransactionsChart";
@@ -76,6 +77,7 @@ export default function ClientDashboard() {
         {/* ── HEADER ── */}
         <header className="dashboard-header">
           <div className="welcome-box">
+             <img src={logoKandjou} alt="Kandjou" style={{ height: 36, marginBottom: 8 }} />
              <p className="welcome-text">Bonjour,</p>
              <h1 className="user-name">{user?.fullname || "Client"}</h1>
           </div>

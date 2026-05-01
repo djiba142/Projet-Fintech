@@ -10,7 +10,7 @@ export const translations = {
     navAbout: "À propos",
     navContact: "Contact",
     login: "Connexion",
-    register: "Ouvrir un compte",
+    register: "Créer un compte",
     successTitle: "Compte créé !",
     step1: "Identité",
     step2: "Sécurité",

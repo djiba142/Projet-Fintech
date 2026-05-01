@@ -1,7 +1,5 @@
 import logging
-import psutil
-import os
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import List, Optional, Dict
 from fastapi import APIRouter, HTTPException, Depends, Body
 from pydantic import BaseModel
@@ -32,39 +30,51 @@ class ConfigUpdateRequest(BaseModel):
     key: str
     value: str
 
-# ─── ENDPOINTS ADMIN ───
-
-@router.get("/overview")
-async def get_admin_overview(token_data: Dict = Depends(require_valid_token)):
+# ─── HELPER: vérifier rôle admin ───
+def check_admin(token_data: Dict):
     if token_data.get("role") != "Administrateur":
         raise HTTPException(status_code=403, detail="Accès réservé aux administrateurs")
+
+# ─── OVERVIEW ───
+@router.get("/overview")
+async def get_admin_overview(token_data: Dict = Depends(require_valid_token)):
+    check_admin(token_data)
 
     users = get_all_users()
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    # Statistiques
-    cursor.execute("SELECT COUNT(*) as count FROM audit_logs WHERE timestamp >= date('now', '-1 day')")
-    tx_today = cursor.fetchone()['count']
-    
-    cursor.execute("SELECT COUNT(*) as count FROM audit_logs")
-    total_logs = cursor.fetchone()['count']
-
-    # Système
+    # Statistiques transactions
     try:
-        cpu = psutil.cpu_percent()
-        ram = psutil.virtual_memory().percent
-    except:
-        cpu, ram = 12.5, 45.2 # Fallback si psutil échoue
+        cursor.execute("SELECT COUNT(*) as count FROM transactions")
+        total_tx = cursor.fetchone()['count']
+    except Exception:
+        total_tx = 0
+
+    # Statistiques logs
+    try:
+        cursor.execute("SELECT COUNT(*) as count FROM audit_logs")
+        total_logs = cursor.fetchone()['count']
+    except Exception:
+        total_logs = 0
 
     conn.close()
     
+    # CPU/RAM - fallback si psutil absent
+    try:
+        import psutil
+        cpu = psutil.cpu_percent(interval=0.1)
+        ram = psutil.virtual_memory().percent
+    except Exception:
+        cpu, ram = 12.5, 45.2
+
     return {
         "kpis": {
             "total_users": len(users),
             "clients": len([u for u in users if u['role'] == 'Client']),
             "agents": len([u for u in users if u['role'] == 'Agent de Crédit']),
-            "tx_today": tx_today,
+            "analystes": len([u for u in users if u['role'] == 'Analyste Risque']),
+            "tx_total": total_tx,
             "system_health": "OPTIMAL",
             "uptime": "99.98%"
         },
@@ -75,23 +85,22 @@ async def get_admin_overview(token_data: Dict = Depends(require_valid_token)):
         },
         "user_growth": [
             {"month": "Jan", "count": 45},
-            {"month": "Feb", "count": 52},
+            {"month": "Fev", "count": 52},
             {"month": "Mar", "count": 68},
-            {"month": "Apr", "count": 89}
+            {"month": "Avr", "count": 89},
+            {"month": "Mai", "count": len(users)}
         ]
     }
 
+# ─── UTILISATEURS ───
 @router.get("/users")
 async def get_admin_users(token_data: Dict = Depends(require_valid_token)):
-    if token_data.get("role") != "Administrateur":
-        raise HTTPException(status_code=403, detail="Accès réservé")
+    check_admin(token_data)
     return get_all_users()
 
 @router.post("/users")
 async def admin_create_user(req: UserCreateRequest, token_data: Dict = Depends(require_valid_token)):
-    if token_data.get("role") != "Administrateur":
-        raise HTTPException(status_code=403, detail="Accès réservé")
-    
+    check_admin(token_data)
     res = create_user(req.username, req.password, req.role, req.fullname, req.email)
     if "error" in res:
         raise HTTPException(status_code=400, detail=res["error"])
@@ -99,34 +108,42 @@ async def admin_create_user(req: UserCreateRequest, token_data: Dict = Depends(r
 
 @router.delete("/users/{username}")
 async def admin_delete_user(username: str, token_data: Dict = Depends(require_valid_token)):
-    if token_data.get("role") != "Administrateur":
-        raise HTTPException(status_code=403, detail="Accès réservé")
+    check_admin(token_data)
     delete_user(username)
     return {"status": "deleted"}
 
 @router.post("/users/toggle/{username}")
 async def admin_toggle_user(username: str, token_data: Dict = Depends(require_valid_token)):
-    if token_data.get("role") != "Administrateur":
-        raise HTTPException(status_code=403, detail="Accès réservé")
+    check_admin(token_data)
     return toggle_user_status(username)
 
+# ─── LOGS ───
 @router.get("/logs")
 async def get_admin_logs(token_data: Dict = Depends(require_valid_token)):
-    if token_data.get("role") != "Administrateur":
-        raise HTTPException(status_code=403, detail="Accès réservé")
-    return get_audit_logs(limit=100)
+    check_admin(token_data)
+    raw_logs = get_audit_logs(limit=100)
+    # Transformer les clés pour le frontend
+    formatted = []
+    for log in raw_logs:
+        formatted.append({
+            "timestamp": log.get("timestamp", ""),
+            "username": log.get("user_id", "system"),
+            "event_type": log.get("action", "EVENT"),
+            "details": log.get("details", ""),
+            "result": log.get("result", "SUCCESS"),
+            "ip": "127.0.0.1"
+        })
+    return formatted
 
+# ─── CONFIG ───
 @router.get("/config")
 async def get_admin_config(token_data: Dict = Depends(require_valid_token)):
-    if token_data.get("role") != "Administrateur":
-        raise HTTPException(status_code=403, detail="Accès réservé")
+    check_admin(token_data)
     return get_system_config()
 
 @router.post("/config")
 async def update_admin_config(req: ConfigUpdateRequest, token_data: Dict = Depends(require_valid_token)):
-    if token_data.get("role") != "Administrateur":
-        raise HTTPException(status_code=403, detail="Accès réservé")
-    
+    check_admin(token_data)
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("UPDATE system_config SET config_value = ? WHERE config_key = ?", (req.value, req.key))
@@ -134,38 +151,52 @@ async def update_admin_config(req: ConfigUpdateRequest, token_data: Dict = Depen
     conn.close()
     return {"status": "updated"}
 
-# ─── GESTION DES INSTITUTIONS ───
+# ─── INSTITUTIONS ───
 @router.get("/institutions")
 async def get_admin_institutions(token_data: Dict = Depends(require_valid_token)):
-    if token_data.get("role") != "Administrateur":
-        raise HTTPException(status_code=403, detail="Accès réservé")
-    
-    # Mock data pour les institutions (Orange, MTN)
-    return [
-        {"id": "orange_money", "name": "Orange Money", "status": "ACTIVE", "uptime": "99.9%", "latency": "120ms", "success_rate": "98.5%"},
-        {"id": "mtn_momo", "name": "MTN MoMo", "status": "ACTIVE", "uptime": "99.7%", "latency": "145ms", "success_rate": "97.2%"},
-        {"id": "bcrg_api", "name": "BCRG Sync", "status": "ACTIVE", "uptime": "100%", "latency": "45ms", "success_rate": "100%"}
-    ]
+    check_admin(token_data)
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT name, type, api_status, uptime_score, total_volume FROM institutions")
+        rows = cursor.fetchall()
+        conn.close()
+        result = []
+        for r in rows:
+            result.append({
+                "id": r["name"].lower().replace(" ", "_"),
+                "name": r["name"],
+                "status": r["api_status"],
+                "uptime": f"{r['uptime_score']}%",
+                "latency": "120ms",
+                "success_rate": f"{min(r['uptime_score'], 99.9)}%"
+            })
+        return result
+    except Exception:
+        return [
+            {"id": "orange_money", "name": "Orange Money", "status": "ACTIVE", "uptime": "99.9%", "latency": "120ms", "success_rate": "98.5%"},
+            {"id": "mtn_momo", "name": "MTN MoMo", "status": "ACTIVE", "uptime": "99.7%", "latency": "145ms", "success_rate": "97.2%"},
+            {"id": "bcrg_api", "name": "BCRG Sync", "status": "ACTIVE", "uptime": "100%", "latency": "45ms", "success_rate": "100%"}
+        ]
 
-# ─── GESTION DES TRANSACTIONS GLOBALES ───
+# ─── TRANSACTIONS GLOBALES ───
 @router.get("/transactions")
 async def get_admin_all_transactions(token_data: Dict = Depends(require_valid_token)):
-    if token_data.get("role") != "Administrateur":
-        raise HTTPException(status_code=403, detail="Accès réservé")
-    
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM transactions ORDER BY date DESC LIMIT 200")
-    txs = cursor.fetchall()
-    conn.close()
-    return txs
+    check_admin(token_data)
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM transactions ORDER BY date DESC LIMIT 200")
+        txs = [dict(r) for r in cursor.fetchall()]
+        conn.close()
+        return txs
+    except Exception:
+        return []
 
 # ─── ROLES & PERMISSIONS ───
 @router.get("/roles")
 async def get_admin_roles(token_data: Dict = Depends(require_valid_token)):
-    if token_data.get("role") != "Administrateur":
-        raise HTTPException(status_code=403, detail="Accès réservé")
-    
+    check_admin(token_data)
     return [
         {"role": "Client", "permissions": ["VIEW_OWN_WALLET", "TRANSFER_FUNDS", "VIEW_HISTORY"]},
         {"role": "Agent de Crédit", "permissions": ["VIEW_CLIENTS", "ANALYZE_RISK", "APPROVE_LOAN"]},
