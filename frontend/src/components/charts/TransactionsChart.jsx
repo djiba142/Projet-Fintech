@@ -10,6 +10,8 @@ import {
 } from "chart.js";
 import { Bar, Line } from "react-chartjs-2";
 
+import { useLanguage } from "../../context/LanguageContext";
+
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -21,10 +23,12 @@ ChartJS.register(
 );
 
 export default function TransactionsChart({ data, type = "bar" }) {
+  const { t } = useLanguage();
+
   if (!data || !data.labels || data.labels.length === 0) {
     return (
       <div style={{ height: 250, display: "flex", alignItems: "center", justifyContent: "center", background: "#F8FAFC", borderRadius: 20, color: "#94A3B8", fontWeight: 700, fontSize: "0.8rem" }}>
-        Aucune donnée d'analyse disponible
+        {t("noTx")}
       </div>
     );
   }
@@ -33,7 +37,7 @@ export default function TransactionsChart({ data, type = "bar" }) {
     labels: data.labels,
     datasets: [
       {
-        label: "Entrées (GNF)",
+        label: `${t("income")} (GNF)`,
         data: data.in,
         backgroundColor: "#006233",
         borderColor: "#006233",
@@ -42,7 +46,7 @@ export default function TransactionsChart({ data, type = "bar" }) {
         barThickness: 20,
       },
       {
-        label: "Sorties (GNF)",
+        label: `${t("expenses")} (GNF)`,
         data: data.out,
         backgroundColor: "#10B981",
         borderColor: "#10B981",

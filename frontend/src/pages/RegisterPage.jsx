@@ -1,20 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import logoKandjou from "../assets/logo_kandjou.png";
 import brandingImg from "../assets/register_branding.png";
-import { translations } from "../i18n";
+import { useLanguage } from "../context/LanguageContext";
 
 export default function RegisterPage() {
   const navigate = useNavigate();
-  const [lang, setLang] = useState(localStorage.getItem("kandjou_lang") || "FR");
+  const { t } = useLanguage();
 
-  useEffect(() => {
-    const handleLangChange = () => setLang(localStorage.getItem("kandjou_lang") || "FR");
-    window.addEventListener("languageChange", handleLangChange);
-    return () => window.removeEventListener("languageChange", handleLangChange);
-  }, []);
-
-  const t = translations[lang];
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({ nom: "", tel: "", email: "", mdp: "", mdpConfirm: "", parrainage: "", code: "" });
   const [showMdp, setShowMdp] = useState(false);
@@ -42,12 +35,8 @@ export default function RegisterPage() {
           </div>
 
           <div style={s.brandingInfo}>
-            <h1 style={s.brandingH1}>Ouvrez les portes de l'interopérabilité.</h1>
-            <p style={s.brandingP}>
-              Kandjou est plus qu'un agrégateur. C'est votre partenaire de croissance. 
-              Centralisez vos avoirs Orange Money et MTN MoMo pour une gestion sans barrière, 
-              sécurisée par les standards les plus rigoureux de la BCRG.
-            </p>
+            <h1 style={s.brandingH1}>{t("regVisualTitle")}</h1>
+            <p style={s.brandingP}>{t("regVisualSubtitle")}</p>
           </div>
 
           <div style={s.imageBox}>
@@ -55,11 +44,11 @@ export default function RegisterPage() {
           </div>
 
           <div style={s.trust}>
-            <div style={s.trustItem}>✅ Vision unifiée 360°</div>
+            <div style={s.trustItem}>✅ {t("regTrust1")}</div>
             <div style={s.trustDivider} />
-            <div style={s.trustItem}>✅ Transferts instantanés</div>
+            <div style={s.trustItem}>✅ {t("regTrust2")}</div>
             <div style={s.trustDivider} />
-            <div style={s.trustItem}>✅ Score Crédit Certifié</div>
+            <div style={s.trustItem}>✅ {t("regTrust3")}</div>
           </div>
         </div>
       </div>
@@ -70,8 +59,8 @@ export default function RegisterPage() {
           
           <div style={s.formHeader}>
             <img src={logoKandjou} alt="Kandjou" style={{ height: 35, marginBottom: "0.8rem" }} />
-            <h2 style={s.formH2}>Créer un compte</h2>
-            <p style={s.formP}>Étape {step} sur 3 — {step === 1 ? t.step1 : step === 2 ? t.step2 : t.step3}</p>
+            <h2 style={s.formH2}>{t("register")}</h2>
+            <p style={s.formP}>{t("regStep")} {step} {t("regOf")} 3 — {step === 1 ? t("step1") : step === 2 ? t("step2") : t("step3")}</p>
           </div>
 
           <div style={s.stepper}>
@@ -85,16 +74,16 @@ export default function RegisterPage() {
           <div className="fade-in" key={step} style={s.card}>
             {step === 1 && (
               <div>
-                <h3 style={s.cardTitle}>Commençons par vous</h3>
-                <p style={s.cardSubtitle}>Rejoignez Kandjou et gérez vos finances facilement avec une vision 360°.</p>
+                <h3 style={s.cardTitle}>{t("regTitle1")}</h3>
+                <p style={s.cardSubtitle}>{t("regSubtitle1")}</p>
                 
                 <div style={s.inputWrapper}>
-                  <label style={s.label}>Nom complet *</label>
+                  <label style={s.label}>{t("fullName")} *</label>
                   <input type="text" placeholder="Ex: Kadiatou Bah" style={s.input}
                     value={form.nom} onChange={e => setForm({...form, nom: e.target.value})} />
                 </div>
                 <div style={s.inputWrapper}>
-                  <label style={s.label}>Numéro de téléphone *</label>
+                  <label style={s.label}>{t("phoneLabel")} *</label>
                   <div style={s.telRow}>
                     <div style={s.telCode}>+224</div>
                     <input type="tel" placeholder="620 00 00 00" style={s.telInput}
@@ -102,45 +91,45 @@ export default function RegisterPage() {
                   </div>
                 </div>
                 <div style={s.inputWrapper}>
-                  <label style={s.label}>Email (optionnel)</label>
+                  <label style={s.label}>{t("emailOptional")}</label>
                   <input type="email" placeholder="kadiatou@email.com" style={s.input}
                     value={form.email} onChange={e => setForm({...form, email: e.target.value})} />
                 </div>
                 <button style={{ ...s.btnPrim, opacity: (form.nom && form.tel) ? 1 : 0.4 }}
                   disabled={!form.nom || !form.tel} onClick={next}>
-                  Continuer
+                  {t("btnContinue")}
                 </button>
               </div>
             )}
 
             {step === 2 && (
               <div>
-                <h3 style={s.cardTitle}>Sécurité du compte</h3>
-                <p style={s.cardSubtitle}>Définissez vos identifiants pour un accès sécurisé à votre espace.</p>
+                <h3 style={s.cardTitle}>{t("regTitle2")}</h3>
+                <p style={s.cardSubtitle}>{t("regSubtitle2")}</p>
                 
                 <div style={s.inputWrapper}>
-                  <label style={s.label}>Mot de passe *</label>
+                  <label style={s.label}>{t("passwordLabel")} *</label>
                   <input type={showMdp ? "text" : "password"} placeholder="8 caractères minimum" style={s.input}
                     value={form.mdp} onChange={e => setForm({...form, mdp: e.target.value})} />
                 </div>
                 <div style={s.inputWrapper}>
-                  <label style={s.label}>Confirmer le mot de passe *</label>
+                  <label style={s.label}>{t("confirmPassword")} *</label>
                   <input type={showMdp ? "text" : "password"} placeholder="Répétez le mot de passe" style={s.input}
                     value={form.mdpConfirm} onChange={e => setForm({...form, mdpConfirm: e.target.value})} />
                 </div>
                 <div style={s.optionRow} onClick={() => setShowMdp(!showMdp)}>
                   <div style={{ ...s.check, ...(showMdp ? s.checkOn : {}) }}>{showMdp && "✓"}</div>
-                  <span style={s.optionLabel}>Afficher le mot de passe</span>
+                  <span style={s.optionLabel}>{t("showPassword")}</span>
                 </div>
                 <div style={s.optionRow} onClick={() => setCgv(!cgv)}>
                   <div style={{ ...s.check, ...(cgv ? s.checkOn : {}) }}>{cgv && "✓"}</div>
-                  <span style={s.optionLabel}>J'accepte les conditions d'utilisation</span>
+                  <span style={s.optionLabel}>{t("acceptTerms")}</span>
                 </div>
                 <div style={s.btnRow}>
-                  <button style={s.btnSec} onClick={prev}>Retour</button>
+                  <button style={s.btnSec} onClick={prev}>{t("btnBack")}</button>
                   <button style={{ ...s.btnPrim, opacity: (form.mdp && form.mdp === form.mdpConfirm && cgv) ? 1 : 0.4 }}
                     disabled={!form.mdp || form.mdp !== form.mdpConfirm || !cgv} onClick={next}>
-                    Suivant
+                    {t("btnNext")}
                   </button>
                 </div>
               </div>
@@ -148,19 +137,19 @@ export default function RegisterPage() {
 
             {step === 3 && (
               <div>
-                <h3 style={s.cardTitle}>Vérification SMS</h3>
-                <p style={s.cardSubtitle}>Saisissez le code de vérification envoyé au <strong>+224 {form.tel}</strong></p>
+                <h3 style={s.cardTitle}>{t("regTitle3")}</h3>
+                <p style={s.cardSubtitle}>{t("regSubtitle3")} <strong>+224 {form.tel}</strong></p>
                 
                 <div style={s.inputWrapper}>
                   <input type="text" maxLength="6" placeholder="· · · · · ·" style={s.codeInput}
                     value={form.code} onChange={e => setForm({...form, code: e.target.value})} />
                 </div>
-                <p style={s.resend}>Renvoyer le code dans 00:59</p>
+                <p style={s.resend}>{t("resendCode")} 00:59</p>
                 <div style={s.btnRow}>
-                  <button style={s.btnSec} onClick={prev}>Retour</button>
+                  <button style={s.btnSec} onClick={prev}>{t("btnBack")}</button>
                   <button style={{ ...s.btnPrim, opacity: form.code.length >= 4 ? 1 : 0.4 }}
                     disabled={form.code.length < 4} onClick={next}>
-                    Vérifier
+                    {t("btnVerify")}
                   </button>
                 </div>
               </div>
@@ -169,24 +158,24 @@ export default function RegisterPage() {
             {step === 4 && (
               <div style={s.success}>
                 <div style={s.successCircle}>✓</div>
-                <h3 style={s.successH3}>{t.successTitle}</h3>
-                <p style={s.successP}>Félicitations <strong>{form.nom}</strong>. Votre compte Kandjou est maintenant actif et prêt à l'emploi.</p>
-                <button style={s.btnPrim} onClick={() => navigate("/login")}>{t.login}</button>
+                <h3 style={s.successH3}>{t("successTitle")}</h3>
+                <p style={s.successP}>{t("successMsg").replace("{name}", form.nom)}</p>
+                <button style={s.btnPrim} onClick={() => navigate("/login")}>{t("login")}</button>
               </div>
             )}
           </div>
 
           {step < 4 && (
             <p style={s.footerLink}>
-              Déjà un compte ? <span style={s.link} onClick={() => navigate("/login")}>Se connecter</span>
+              {t("haveAccount")} <span style={s.link} onClick={() => navigate("/login")}>{t("login")}</span>
             </p>
           )}
 
           <div style={s.secureBadge}>
             <span style={{ fontSize: "1.4rem" }}>🛡️</span>
             <div>
-              <div style={s.secureTitle}>Données Ultra-Sécurisées</div>
-              <div style={s.secureDesc}>Régulation BCRG n°001/2019 • Cryptage AES-256</div>
+              <div style={s.secureTitle}>{t("secureData")}</div>
+              <div style={s.secureDesc}>{t("bcrgReg")}</div>
             </div>
           </div>
 

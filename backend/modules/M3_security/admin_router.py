@@ -199,7 +199,7 @@ async def get_admin_all_transactions(token_data: Dict = Depends(require_valid_to
     check_admin(token_data)
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM transactions ORDER BY date DESC LIMIT 200")
+    cursor.execute("SELECT * FROM transactions ORDER BY created_at DESC LIMIT 200")
     txs = [dict(r) for r in cursor.fetchall()]
     conn.close()
     return txs

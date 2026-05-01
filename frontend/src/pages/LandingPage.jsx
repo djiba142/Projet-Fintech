@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../components/Header";
-import { translations } from "../i18n";
+import { useLanguage } from "../context/LanguageContext";
 import logoKandjou from "../assets/logo_kandjou.png";
 
 export default function LandingPage() {
   const navigate = useNavigate();
-  const [lang, setLang] = useState(localStorage.getItem("kandjou_lang") || "FR");
+  const { t } = useLanguage();
   const [stats, setStats] = useState({ total_users: "7 000+", total_transactions: "250k+", active_partners: "15+", availability: "99.9%" });
 
   useEffect(() => {
@@ -22,13 +22,7 @@ export default function LandingPage() {
         });
       })
       .catch(err => console.error("Stats fetch error:", err));
-
-    const handleLangChange = () => setLang(localStorage.getItem("kandjou_lang") || "FR");
-    window.addEventListener("languageChange", handleLangChange);
-    return () => window.removeEventListener("languageChange", handleLangChange);
   }, []);
-
-  const t = translations[lang];
 
   return (
     <div style={s.page}>
@@ -45,58 +39,58 @@ export default function LandingPage() {
       {/* BCRG Top Bar */}
       <div style={s.topBar}>
         <div style={s.topInner}>
-          <span>🛡️ Certification BCRG n°001/2019 • Standard de sécurité bancaire AES-256</span>
+          <span>{t("bcrgCert")}</span>
           <div style={s.topRight}>
-             <span>Centre d'aide 24/7</span>
+             <span>{t("helpCenter")}</span>
              <span style={{opacity: 0.3}}>|</span>
-             <span>Guinée, Conakry</span>
+             <span>{t("location")}</span>
           </div>
         </div>
       </div>
 
       <Header />
 
-      {/* ═══════════ HERO ═══════════ */}
+      {/* \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 HERO \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 */}
       <section id="hero" style={s.hero}>
         <div style={s.heroInner}>
           <div style={s.heroText}>
-            <div style={s.badge}>Premier agrégateur agréé de Guinée 🇬🇳</div>
+            <div style={s.badge}>{t("heroBadge")}</div>
             <h1 style={s.heroH1}>
-              {t.heroTitle.split('\n')[0]}<br />
-              <span className="gradient-text">{t.heroTitle.split('\n')[1] || ""}</span>
+              {t("heroTitle").split('\n')[0]}<br />
+              <span className="gradient-text">{t("heroTitle").split('\n')[1] || ""}</span>
             </h1>
             <p style={s.heroP}>
-              {t.heroSubtitle}
+              {t("heroSubtitle")}
             </p>
             <div style={s.heroBtns}>
-              <button onClick={() => navigate("/register")} style={s.btnPrim}>{t.btnStart}</button>
-              <button onClick={() => document.getElementById('features')?.scrollIntoView({behavior:'smooth'})} style={s.btnSec}>{t.btnDiscover}</button>
+              <button onClick={() => navigate("/register")} style={s.btnPrim}>{t("btnStart")}</button>
+              <button onClick={() => document.getElementById('features')?.scrollIntoView({behavior:'smooth'})} style={s.btnSec}>{t("btnDiscover")}</button>
             </div>
             <div style={s.heroStats}>
               <div style={s.heroStatItem}>
                 <span style={s.hStatVal}>{stats.total_transactions}</span>
-                <span style={s.hStatLab}>Transactions/jour</span>
+                <span style={s.hStatLab}>{t("statsTx")}</span>
               </div>
               <div style={s.hStatDivider} />
               <div style={s.heroStatItem}>
                 <span style={s.hStatVal}>{stats.availability}</span>
-                <span style={s.hStatLab}>Sécurisé BCRG</span>
+                <span style={s.hStatLab}>{t("statsSecurity")}</span>
               </div>
             </div>
           </div>
 
           <div style={s.heroImageWrap}>
              <div style={s.floatingCard1}>
-                <div style={s.fIcon}>📈</div>
+                <div style={s.fIcon}>\ud83d\udcc8</div>
                 <div>
-                   <div style={s.fTitle}>Solde Consolidé</div>
+                   <div style={s.fTitle}>{t("cardBalance")}</div>
                    <div style={s.fVal}>12 847 500 GNF</div>
                 </div>
              </div>
              <div style={s.floatingCard2}>
-                <div style={s.fIcon}>⚡</div>
+                <div style={s.fIcon}>\u26a1</div>
                 <div>
-                   <div style={s.fTitle}>Score Crédit</div>
+                   <div style={s.fTitle}>{t("cardScore")}</div>
                    <div style={s.fVal}>72 / 100</div>
                 </div>
              </div>
@@ -105,19 +99,19 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ═══════════ FONCTIONNALITÉS ═══════════ */}
+      {/* \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 FONCTIONNALIT\u00c9S \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 */}
       <section id="features" style={s.section}>
         <div style={s.sectionHeader}>
-          <h2 style={s.sectionTitle}>Une plateforme, des possibilités infinies</h2>
-          <p style={s.sectionSubtitle}>Nos solutions sont conçues pour répondre aux exigences des particuliers et des institutions financières guinéennes.</p>
+          <h2 style={s.sectionTitle}>{t("featTitle")}</h2>
+          <p style={s.sectionSubtitle}>{t("featSubtitle")}</p>
         </div>
 
         <div style={s.featureGrid}>
           {[
-            { title: "Vue Consolidée 360°", desc: "Plus besoin de jongler entre les applications. Visualisez vos soldes Orange et MTN en un coup d'œil sur un tableau de bord unifié.", icon: "🏦" },
-            { title: "Transferts Inter-opérateurs", desc: "Décloisonnez vos finances. Transférez des fonds entre vos comptes de différents opérateurs instantanément et sans effort.", icon: "🔄" },
-            { title: "Scoring de Solvabilité AI", desc: "Valorisez vos données de transactions pour obtenir un score de crédit fiable, reconnu par nos institutions partenaires.", icon: "📊" },
-            { title: "Sécurité de Niveau Bancaire", desc: "Nous utilisons les standards de chiffrement les plus élevés pour garantir que vos données restent privées et sécurisées.", icon: "🛡️" },
+            { title: t("feat1Title"), desc: t("feat1Desc"), icon: "\ud83c\udfe6" },
+            { title: t("feat2Title"), desc: t("feat2Desc"), icon: "\ud83d\udd04" },
+            { title: t("feat3Title"), desc: t("feat3Desc"), icon: "\ud83d\udcca" },
+            { title: t("feat4Title"), desc: t("feat4Desc"), icon: "\ud83d\udee1\ufe0f" },
           ].map((f, i) => (
             <div key={i} className="hover-lift" style={s.featureCard}>
               <div style={s.featureIcon}>{f.icon}</div>
@@ -128,18 +122,18 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ═══════════ COMMENT ÇA MARCHE ═══════════ */}
+      {/* \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 COMMENT \u00c7A MARCHE \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 */}
       <section id="how-it-works" style={s.sectionAlt}>
         <div style={s.sectionHeader}>
-          <h2 style={s.sectionTitle}>Votre parcours vers l'intelligence financière</h2>
-          <p style={s.sectionSubtitle}>Trois étapes simples pour transformer votre gestion financière quotidienne.</p>
+          <h2 style={s.sectionTitle}>{t("howTitle")}</h2>
+          <p style={s.sectionSubtitle}>{t("howSubtitle")}</p>
         </div>
 
         <div style={s.stepsGrid}>
           {[
-            { step: "01", title: "Liez vos comptes", desc: "Connectez vos comptes Orange Money et MTN MoMo en toute sécurité via notre interface cryptée." },
-            { step: "02", title: "Analysez vos flux", desc: "Laissez Kandjou agréger vos données pour vous offrir une vision claire de vos revenus et dépenses." },
-            { step: "03", title: "Profitez du crédit", desc: "Utilisez votre score de solvabilité pour accéder à des offres de crédit adaptées auprès de nos banques partenaires." },
+            { step: "01", title: t("step1Title"), desc: t("step1Desc") },
+            { step: "02", title: t("step2Title"), desc: t("step2Desc") },
+            { step: "03", title: t("step3Title"), desc: t("step3Desc") },
           ].map((st, i) => (
             <div key={i} style={s.stepCard}>
               <div style={s.stepNumber}>{st.step}</div>
@@ -150,31 +144,25 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ═══════════ À PROPOS ═══════════ */}
+      {/* \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 \u00c0 PROPOS \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 */}
       <section id="about" style={s.section}>
         <div style={s.aboutGrid}>
           <div style={s.aboutText}>
-            <h2 style={s.sectionTitle}>À propos de Kandjou Fintech</h2>
-            <p style={s.aboutP}>
-              Kandjou est une fintech guinéenne visionnaire née de la volonté de simplifier l'accès aux services financiers dans un paysage mobile-first. 
-              En tant que pionnier de l'Open Banking en Guinée, nous travaillons en étroite collaboration avec la BCRG pour bâtir un écosystème financier plus inclusif, plus transparent et plus performant.
-            </p>
-            <p style={s.aboutP}>
-              Notre mission est de donner le pouvoir aux utilisateurs sur leurs données financières, tout en offrant aux institutions les outils nécessaires pour évaluer les risques avec une précision sans précédent.
-            </p>
+            <h2 style={s.sectionTitle}>{t("aboutTitle")}</h2>
+            <p style={s.aboutP}>{t("aboutP1")}</p>
+            <p style={s.aboutP}>{t("aboutP2")}</p>
             <div style={s.aboutKPIs}>
               <div style={s.akpi}>
                 <span style={s.akpiVal}>{stats.total_users}</span>
-                <span style={s.akpiLab}>Comptes liés</span>
+                <span style={s.akpiLab}>{t("aboutKpi1")}</span>
               </div>
               <div style={s.akpi}>
                 <span style={s.akpiVal}>{stats.active_partners}</span>
-                <span style={s.akpiLab}>Partenaires IMF</span>
+                <span style={s.akpiLab}>{t("aboutKpi2")}</span>
               </div>
             </div>
           </div>
           <div style={s.aboutImage}>
-             {/* Placeholder for branding visual */}
              <div style={s.aboutVisual}>
                 <div style={s.avCircle} />
                 <div style={s.avLabel}>Kandjou Core v2.4</div>
@@ -183,35 +171,35 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ═══════════ FOOTER ═══════════ */}
+      {/* \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 FOOTER \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 */}
       <footer id="footer" style={s.footer}>
         <div style={s.footerMain}>
           <div style={s.fCol1}>
             <div style={s.logoWrap} onClick={() => navigate("/")}>
               <img src={logoKandjou} alt="Kandjou Logo" style={s.logoImgFooter} />
             </div>
-            <p style={s.fDesc}>L'excellence financière pour chaque Guinéen.</p>
+            <p style={s.fDesc}>{t("footerSlogan")}</p>
           </div>
           <div style={s.fCol}>
-            <h4 style={s.fColTitle}>Produit</h4>
-            <span style={s.fLink} onClick={() => navigate("/login")}>Dashboard</span>
-            <span style={s.fLink} onClick={() => navigate("/login")}>Transactions</span>
-            <span style={s.fLink} onClick={() => navigate("/login")}>Credit Scoring</span>
+            <h4 style={s.fColTitle}>{t("footerCol1")}</h4>
+            <span style={s.fLink} onClick={() => navigate("/login")}>{t("fLinkDashboard")}</span>
+            <span style={s.fLink} onClick={() => navigate("/login")}>{t("fLinkTx")}</span>
+            <span style={s.fLink} onClick={() => navigate("/login")}>{t("fLinkScoring")}</span>
           </div>
           <div style={s.fCol}>
-            <h4 style={s.fColTitle}>Légal</h4>
-            <span style={s.fLink}>Conditions</span>
-            <span style={s.fLink}>Confidentialité</span>
-            <span style={s.fLink}>Règlement BCRG</span>
+            <h4 style={s.fColTitle}>{t("footerCol2")}</h4>
+            <span style={s.fLink}>{t("fLinkTerms")}</span>
+            <span style={s.fLink}>{t("fLinkPrivacy")}</span>
+            <span style={s.fLink}>{t("fLinkBcrg")}</span>
           </div>
           <div style={s.fCol}>
-            <h4 style={s.fColTitle}>Contact</h4>
+            <h4 style={s.fColTitle}>{t("footerCol3")}</h4>
             <a href="mailto:support@kandjou.com" style={s.fLink}>support@kandjou.com</a>
             <a href="tel:+224620123456" style={s.fLink}>+224 620 12 34 56</a>
           </div>
         </div>
         <div style={s.footerBottom}>
-          <span>© 2026 Kandjou Fintech. Tous droits réservés. Immatriculé à Conakry, Guinée.</span>
+          <span>{t("footerCopyright")}</span>
         </div>
       </footer>
     </div>

@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { translations } from "../i18n";
+import { useLanguage } from "../context/LanguageContext";
 import { useAuth } from "../context/AuthContext";
 import logoKandjou from "../assets/logo_kandjou.png";
 
@@ -10,18 +10,12 @@ export default function Header() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
-  const [lang, setLang] = useState(localStorage.getItem("kandjou_lang") || "FR");
+  const { language, setLanguage, t } = useLanguage();
   const [showLang, setShowLang] = useState(false);
 
-  const t = translations[lang];
-
   const changeLang = async (code) => {
-    setLang(code);
-    localStorage.setItem("kandjou_lang", code);
+    setLanguage(code);
     setShowLang(false);
-    
-    // Notify other components
-    window.dispatchEvent(new Event("languageChange"));
 
     // Sync with backend if logged in
     if (user?.username) {
@@ -59,9 +53,9 @@ export default function Header() {
   const languages = [
     { code: "FR", name: "Français" },
     { code: "EN", name: "Anglais" },
-    { code: "ZH", name: "Chinois" },
-    { code: "AR", name: "Arabe" },
-    { code: "NK", name: "N'ko" }
+    { code: "NK", name: "N'ko (ߒߞߏ)" },
+    { code: "AD", name: "ADLAM (𞤀𞤣𞤤𞤢𞤥)" },
+    { code: "AR", name: "Arabe (🇸🇦)" }
   ];
 
   return (
@@ -72,11 +66,11 @@ export default function Header() {
 
       <nav style={s.nav}>
         {[
-          { label: t.navHome, id: "hero" },
-          { label: t.navFeatures, id: "features" },
-          { label: t.navHow, id: "how-it-works" },
-          { label: t.navAbout, id: "about" },
-          { label: t.navContact, id: "footer" }
+          { label: t("navHome"), id: "hero" },
+          { label: t("navFeatures"), id: "features" },
+          { label: t("navHow"), id: "how-it-works" },
+          { label: t("navAbout"), id: "about" },
+          { label: t("navContact"), id: "footer" }
         ].map((item) => (
           <button 
             key={item.id} 
@@ -93,7 +87,7 @@ export default function Header() {
       <div style={s.actions}>
         <div style={s.langWrapper}>
           <button style={s.langBtn} onClick={() => setShowLang(!showLang)}>
-            🌐 {lang} ▾
+            🌐 {language} ▾
           </button>
           {showLang && (
             <div style={s.langDropdown}>
@@ -125,8 +119,8 @@ export default function Header() {
           </button>
         ) : (
           <>
-            <button onClick={() => navigate("/login")} style={s.btnSec}>{t.login}</button>
-            <button onClick={() => navigate("/register")} style={s.btnPrim}>{t.register}</button>
+            <button onClick={() => navigate("/login")} style={s.btnSec}>{t("login")}</button>
+            <button onClick={() => navigate("/register")} style={s.btnPrim}>{t("register")}</button>
           </>
         )}
       </div>

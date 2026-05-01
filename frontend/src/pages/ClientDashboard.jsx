@@ -17,6 +17,7 @@ import {
   Target
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
 import useTransactionsSocket from "../hooks/useTransactionsSocket";
 import axios from "axios";
 import logoKandjou from "../assets/logo_kandjou.png";
@@ -30,6 +31,7 @@ const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
 export default function ClientDashboard() {
   const navigate = useNavigate();
   const { user, token } = useAuth();
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
   const [transactions, setTransactions] = useState([]);
@@ -66,7 +68,7 @@ export default function ClientDashboard() {
   if (loading) return (
     <div className="flex-center" style={{ minHeight: "60vh" }}>
       <RefreshCcw className="spin" size={40} color="#006233" />
-      <p style={{ marginTop: "1rem", fontWeight: 700, color: "#64748B" }}>Synchronisation sécurisée...</p>
+      <p style={{ marginTop: "1rem", fontWeight: 700, color: "#64748B" }}>{t("syncing")}</p>
       <style>{`.spin { animation: spin 1s linear infinite; } @keyframes spin { 100% { transform: rotate(360deg); } } .flex-center { display: flex; flex-direction: column; align-items: center; justify-content: center; }`}</style>
     </div>
   );
@@ -78,7 +80,7 @@ export default function ClientDashboard() {
         <header className="dashboard-header">
           <div className="welcome-box">
              <img src={logoKandjou} alt="Kandjou" style={{ height: 36, marginBottom: 8 }} />
-             <p className="welcome-text">Bonjour,</p>
+             <p className="welcome-text">{t("welcome")}</p>
              <h1 className="user-name">{user?.fullname || "Client"}</h1>
           </div>
           <div className="header-actions">
@@ -96,7 +98,7 @@ export default function ClientDashboard() {
               {/* CARTE SOLDE */}
               <div className="main-balance-card">
                   <div className="card-top">
-                    <p className="balance-label">Patrimoine total agrégé</p>
+                    <p className="balance-label">{t("totalBalance")}</p>
                     <div className="operator-badges">
                         <img src="/orange.png" alt="OM" />
                         <img src="/mtn.png" alt="MoMo" />
@@ -106,8 +108,8 @@ export default function ClientDashboard() {
                     <h2 className="amount-val" style={{ fontSize: "2.4rem" }}>{(data?.total_balance || 0).toLocaleString()} <span className="currency">GNF</span></h2>
                   </div>
                   <div className="card-actions">
-                    <button className="action-btn" onClick={() => navigate("/transfers")}><Plus size={20} /> Nouveau transfert</button>
-                    <button className="action-btn secondary" onClick={fetchData}><RefreshCcw size={18} /> Actualiser</button>
+                    <button className="action-btn" onClick={() => navigate("/transfers")}><Plus size={20} /> {t("sendMoney")}</button>
+                    <button className="action-btn secondary" onClick={fetchData}><RefreshCcw size={18} /> {t("allTransactions")}</button>
                   </div>
                   <div className="bg-pattern"></div>
               </div>
@@ -117,11 +119,11 @@ export default function ClientDashboard() {
                   <div className="card-header">
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <PieChart size={18} color="#006233" />
-                      <h3>Flux financiers</h3>
+                      <h3>{t("financialFlows")}</h3>
                     </div>
                     <div className="chart-tabs">
-                        <button className={filter === '7d' ? 'active' : ''} onClick={() => setFilter('7d')}>7j</button>
-                        <button className={filter === '30d' ? 'active' : ''} onClick={() => setFilter('30d')}>30j</button>
+                        <button className={filter === '7d' ? 'active' : ''} onClick={() => setFilter('7d')}>{t("last7Days")}</button>
+                        <button className={filter === '30d' ? 'active' : ''} onClick={() => setFilter('30d')}>{t("last30Days")}</button>
                     </div>
                   </div>
                   <div className="chart-wrapper">
@@ -141,14 +143,14 @@ export default function ClientDashboard() {
                 <div className="card-header">
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <Target size={18} color="#006233" />
-                    <h3>Score Kandjou</h3>
+                    <h3>{t("cardScore")}</h3>
                   </div>
                 </div>
                 <div className="score-content">
                   <ScoreChart score={analytics.score || 78} />
                   <div className="score-info">
-                    <p className="score-status">Excellent</p>
-                    <p className="score-desc">Votre éligibilité au crédit est optimale.</p>
+                    <p className="score-status">{t("scoreStatus")}</p>
+                    <p className="score-desc">{t("scoreDesc")}</p>
                   </div>
                 </div>
               </div>
@@ -158,7 +160,7 @@ export default function ClientDashboard() {
                 <div className="live-transactions-section">
                   <div className="section-title">
                     <Zap size={16} color="#F59E0B" fill="#F59E0B" />
-                    <span>En direct</span>
+                    <span>{t("live")}</span>
                   </div>
                   <div className="live-list">
                     {liveTransactions.slice(0, 2).map(tx => (
@@ -166,7 +168,7 @@ export default function ClientDashboard() {
                         <div className="live-left">
                           <img src={tx.operator === 'ORANGE' ? '/orange.png' : '/mtn.png'} alt="Op" />
                           <div>
-                            <p className="live-title">Vers {tx.recipient}</p>
+                            <p className="live-title">{t("to")} {tx.recipient}</p>
                             <p className="live-msg">{tx.message}</p>
                           </div>
                         </div>
@@ -183,18 +185,18 @@ export default function ClientDashboard() {
               {/* DERNIÈRES TRANSACTIONS */}
               <div className="recent-tx-card">
                   <div className="card-header">
-                    <h3>Historique</h3>
-                    <button className="view-all" onClick={() => navigate("/transactions")}>Tout voir</button>
+                    <h3>{t("history")}</h3>
+                    <button className="view-all" onClick={() => navigate("/transactions")}>{t("allTransactions")}</button>
                   </div>
                   <div className="tx-filters">
-                    <button className={`filter-chip ${activeOp === 'ALL' ? 'active' : ''}`} onClick={() => setActiveOp('ALL')}>Tous</button>
+                    <button className={`filter-chip ${activeOp === 'ALL' ? 'active' : ''}`} onClick={() => setActiveOp('ALL')}>{t("all")}</button>
                     <button className={`filter-chip ${activeOp === 'ORANGE' ? 'active' : ''}`} onClick={() => setActiveOp('ORANGE')}>Orange</button>
                     <button className={`filter-chip ${activeOp === 'MTN' ? 'active' : ''}`} onClick={() => setActiveOp('MTN')}>MTN</button>
                   </div>
                   <div className="tx-list">
                     {(() => {
                         const filtered = transactions.filter(tx => activeOp === 'ALL' || tx.op === activeOp);
-                        if (filtered.length === 0) return <p className="empty-tx">Aucune transaction trouvée.</p>;
+                        if (filtered.length === 0) return <p className="empty-tx">{t("noTx")}</p>;
                         return filtered.map(tx => (
                           <div key={tx.id} className="tx-row">
                             <div className={`tx-icon ${tx.type.toLowerCase()}`}>

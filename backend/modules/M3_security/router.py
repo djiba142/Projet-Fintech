@@ -237,10 +237,26 @@ async def require_regulator_token(token: Optional[str] = Query(None), authorizat
 @router.get("/admin/system-overview")
 async def get_system_overview(admin_session: Dict = Depends(require_admin_token)):
     """Retourne l'état complet du système pour le Dashboard Admin."""
-    from modules.common.database import get_all_users
+    from modules.common.database import get_all_users, get_db_connection
     
     users = get_all_users()
     agents_count = len([u for u in users if u["role"] == "Agent de Crédit"])
+    
+    # Stats réelles depuis la base
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM transactions")
+        total_tx = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM institutions")
+        total_inst = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM loan_dossiers")
+        total_scorings = cursor.fetchone()[0]
+        conn.close()
+    except:
+        total_tx = 0
+        total_inst = 0
+        total_scorings = 0
     
     return {
         "system_status": {
@@ -254,10 +270,10 @@ async def get_system_overview(admin_session: Dict = Depends(require_admin_token)
         "security_alerts": SECURITY_ALERTS,
         "stats": {
             "total_users": len(users),
-            "total_transactions": 14502,
+            "total_transactions": total_tx,
             "total_agents": agents_count,
-            "total_institutions": 5,
-            "total_scorings_today": 124,
+            "total_institutions": total_inst,
+            "total_scorings_today": total_scorings,
             "avg_latency": "320ms",
             "active_sessions": len(ACTIVE_SESSIONS)
         },
@@ -269,11 +285,39 @@ async def get_system_overview(admin_session: Dict = Depends(require_admin_token)
 
 @router.get("/admin/transactions")
 async def get_all_transactions(limit: int = 50, admin_session: Dict = Depends(require_admin_token)):
-    return [
-        {"id": "TX-9981", "client": "Kadiatou Bah", "type": "TRANSFERT", "amount": "500 000 GNF", "status": "SUCCESS", "time": "14:45"},
-        {"id": "TX-9980", "client": "Mamadou Diallo", "type": "CREDIT", "amount": "1 200 000 GNF", "status": "SUCCESS", "time": "14:30"},
-        {"id": "TX-9979", "client": "Fatoumata Sylla", "type": "DEPOT", "amount": "150 000 GNF", "status": "SUCCESS", "time": "14:15"}
-    ]
+    from modules.common.database import get_db_connection
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT t.tx_id, t.client_id, u.fullname, t.operator, t.type, t.amount, 
+                   t.receiver, t.description, t.status, t.created_at
+            FROM transactions t
+            LEFT JOIN users u ON t.client_id = u.username
+            ORDER BY t.created_at DESC
+            LIMIT ?
+        """, (limit,))
+        rows = cursor.fetchall()
+        conn.close()
+        return [
+            {
+                "id": r["tx_id"],
+                "client_id": r["client_id"],
+                "client": r["fullname"] or r["client_id"],
+                "operator": r["operator"],
+                "type": r["type"],
+                "amount": r["amount"],
+                "amount_formatted": f"{r['amount']:,.0f} GNF",
+                "receiver": r["receiver"],
+                "description": r["description"],
+                "status": r["status"],
+                "time": r["created_at"]
+            }
+            for r in rows
+        ]
+    except Exception as e:
+        logger.error(f"Erreur admin/transactions: {e}")
+        return []
 
 @router.post("/admin/create-user")
 async def create_user_endpoint(data: Dict = Body(...), admin_session: Dict = Depends(require_admin_token)):
@@ -336,26 +380,81 @@ async def download_admin_report(admin_session: Dict = Depends(require_admin_toke
 
 @router.get("/audit/overview")
 async def get_audit_overview(reg_session: Dict = Depends(require_regulator_token)):
-    """Tableau de bord global pour le régulateur."""
-    from modules.common.database import get_all_users
+    """Tableau de bord global pour le régulateur — données réelles."""
+    from modules.common.database import get_db_connection
     
-    users = get_all_users()
-    institutions_count = len([u for u in users if u["role"] == "Agent de Crédit"]) 
-    
-    return {
-        "stats": {
-            "total_transactions": 245896,
-            "total_volume": "1 450 000 000 GNF",
-            "active_users": len([u for u in users if u["status"] == "active"]),
-            "connected_institutions": institutions_count
-        },
-        "anomalies_count": 12,
-        "compliance_rate": "98.5%",
-        "recent_alerts": [
-            {"id": 1, "type": "MONTANT_ÉLEVÉ", "desc": "Transaction > 15M GNF détectée", "target": "Client #442", "time": "10:30"},
-            {"id": 2, "type": "ACTIVITÉ_SUSPECTE", "desc": "Transferts multiples rapides", "target": "Client #118", "time": "09:15"}
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Stats transactions réelles
+        cursor.execute("SELECT COUNT(*) as cnt, COALESCE(SUM(amount), 0) as total FROM transactions")
+        tx_stats = cursor.fetchone()
+        
+        # Utilisateurs actifs
+        cursor.execute("SELECT COUNT(*) FROM users WHERE status = 'active'")
+        active_users = cursor.fetchone()[0]
+        
+        # Institutions (agents)
+        cursor.execute("SELECT COUNT(*) FROM users WHERE role = 'Agent de Crédit'")
+        agents_count = cursor.fetchone()[0]
+        
+        # Alertes ouvertes
+        cursor.execute("SELECT COUNT(*) FROM audit_alerts WHERE status IN ('OPEN', 'INVESTIGATING')")
+        open_alerts = cursor.fetchone()[0]
+        
+        # Alertes récentes
+        cursor.execute("""
+            SELECT id, type, details, client_id, severity, status, created_at 
+            FROM audit_alerts 
+            ORDER BY created_at DESC 
+            LIMIT 5
+        """)
+        recent_alerts = [
+            {
+                "id": a["id"], 
+                "type": a["type"], 
+                "desc": a["details"], 
+                "target": f"Client {a['client_id']}", 
+                "severity": a["severity"],
+                "status": a["status"],
+                "time": a["created_at"]
+            } 
+            for a in cursor.fetchall()
         ]
-    }
+        
+        # Dossiers stats
+        cursor.execute("SELECT COUNT(*) FROM loan_dossiers WHERE status = 'APPROVED'")
+        approved = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM loan_dossiers WHERE status = 'REJECTED'")
+        rejected = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM loan_dossiers")
+        total_dossiers = cursor.fetchone()[0]
+        
+        compliance_rate = round((approved / total_dossiers * 100), 1) if total_dossiers > 0 else 0
+        
+        conn.close()
+        
+        return {
+            "stats": {
+                "total_transactions": tx_stats["cnt"],
+                "total_volume": f"{tx_stats['total']:,.0f} GNF",
+                "active_users": active_users,
+                "connected_institutions": agents_count + 4  # Agents + Institutions fixes (Orange, MTN, Vista, Ecobank)
+            },
+            "anomalies_count": open_alerts,
+            "compliance_rate": f"{compliance_rate}%",
+            "loan_stats": {
+                "total": total_dossiers,
+                "approved": approved,
+                "rejected": rejected,
+                "pending": total_dossiers - approved - rejected
+            },
+            "recent_alerts": recent_alerts
+        }
+    except Exception as e:
+        logger.error(f"Erreur audit/overview: {e}")
+        return {"stats": {}, "anomalies_count": 0, "compliance_rate": "N/A", "recent_alerts": []}
 
 @router.get("/audit/institutions")
 async def get_audit_institutions(reg_session: Dict = Depends(require_regulator_token)):

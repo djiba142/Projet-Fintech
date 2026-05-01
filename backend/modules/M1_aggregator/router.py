@@ -129,23 +129,7 @@ def normalize_sources(msisdn_orange: Optional[str], msisdn_mtn: Optional[str],
         ))
     return sources
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Endpoints
-# ─────────────────────────────────────────────────────────────────────────────
-
-@router.get("/health")
-async def health_check():
-    return {
-        "status": "online",
-        "mode": "http-sync-dual-msisdn",
-        "timestamp": datetime.now().isoformat()
-    }
-
-@router.get("/risk/threshold")
-async def get_threshold():
-    return {"threshold": get_risk_threshold()}
-
-@router.post("/risk/threshold")
+# ──────────────────────────────────�@router.post("/risk/threshold")
 async def update_threshold(threshold: int = Body(..., embed=True)):
     set_risk_threshold(threshold)
     return {"message": "Seuil mis à jour avec succès", "new_threshold": threshold}
@@ -192,11 +176,10 @@ async def aggregate(
         logger.warning(f"❌ Accès refusé : Client {primary} tente d'accéder à {msisdn}")
         raise HTTPException(status_code=403, detail="Accès interdit : vous ne pouvez consulter que votre propre dossier.")
     
-    # 2. L'administrateur et le régulateur n'ont pas accès aux détails financiers (Ségrégation des tâches)
+    # 2. L'administrateur et le régulateur ont désormais accès pour la simulation et l'audit
     if user_role in ["Administrateur", "Régulateur (BCRG)"]:
-        logger.warning(f"❌ Accès refusé : {user_role} tente d'accéder aux données confidentielles de {msisdn}")
-        raise HTTPException(status_code=403, detail=f"Accès interdit : les {user_role}s n'ont pas accès aux détails financiers des clients.")
-
+        logger.info(f"👁️ Accès Supervision : {user_role} consulte {msisdn}")
+    
     # 3. L'agent ne peut voir que ses dossiers autorisés
     if user_role == "Agent de Crédit" and msisdn != primary:
         from modules.common.database import get_all_loan_dossiers
