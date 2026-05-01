@@ -125,8 +125,17 @@ export default function MainLayout({ children }) {
         <span style={{ color: "#fff", marginLeft: 10, fontWeight: 900, fontSize: "1.2rem", letterSpacing: -0.5 }}>KANDJOU</span>
       </div>
 
-      {/* Nav Section */}
-      <nav style={{ flex: 1, display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+      {/* Nav Section - Scrollable */}
+      <nav style={{ 
+        flex: 1, 
+        display: "flex", 
+        flexDirection: "column", 
+        gap: "0.2rem", 
+        overflowY: "auto",
+        paddingRight: "4px",
+        scrollbarWidth: "none", // Firefox
+        msOverflowStyle: "none"  // IE/Edge
+      }}>
         {menu.map((item) => {
           const isMatch = item.path.includes('?') 
             ? (location.pathname === item.path.split('?')[0] && location.search === `?${item.path.split('?')[1]}`)
@@ -143,25 +152,28 @@ export default function MainLayout({ children }) {
               }}
               className={isMatch ? "active-sidebar-item" : ""}
               style={{
-                display: "flex", alignItems: "center", gap: "1.2rem",
-                padding: "1rem 1.6rem", borderRadius: 16, border: "none",
+                display: "flex", alignItems: "center", gap: "1rem",
+                padding: "0.85rem 1.4rem", borderRadius: 14, border: "none",
                 background: isMatch ? "rgba(255,255,255,0.18)" : "transparent",
-                color: isMatch ? "#fff" : "rgba(255,255,255,0.85)",
-                fontSize: "1rem", fontWeight: isMatch ? 800 : 600,
+                color: isMatch ? "#fff" : "rgba(255,255,255,0.8)",
+                fontSize: "0.9rem", fontWeight: isMatch ? 800 : 600,
                 cursor: "pointer", transition: "all 0.2s",
-                textAlign: "left", width: "100%"
+                textAlign: "left", width: "100%",
+                flexShrink: 0
               }}
+              onMouseOver={e => !isMatch && (e.currentTarget.style.background = "rgba(255,255,255,0.05)")}
+              onMouseOut={e => !isMatch && (e.currentTarget.style.background = "transparent")}
             >
               <item.icon size={18} strokeWidth={isMatch ? 2.5 : 2} />
-              {item.label}
+              <span style={{ whiteSpace: "nowrap" }}>{item.label}</span>
             </button>
           );
         })}
       </nav>
 
       {/* Bottom info */}
-      <div style={{ padding: "1rem 0", borderTop: "1px solid rgba(255,255,255,0.1)", marginTop: "1rem" }}>
-        <p style={{ color: "rgba(255,255,255,0.4)", fontSize: "0.6rem", fontWeight: 700, textTransform: "uppercase" }}>Version 4.2.0 • 2026</p>
+      <div style={{ padding: "1rem 0", borderTop: "1px solid rgba(255,255,255,0.1)", marginTop: "0.5rem" }}>
+        <p style={{ color: "rgba(255,255,255,0.3)", fontSize: "0.6rem", fontWeight: 700, textTransform: "uppercase", textAlign: "center" }}>Version 4.2.0 • 2026</p>
       </div>
     </>
   );
