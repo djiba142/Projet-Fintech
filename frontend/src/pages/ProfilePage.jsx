@@ -21,21 +21,27 @@ import {
   Calendar,
   IdCard
 } from "lucide-react";
+import axios from "axios";
+import { useAuth } from "../context/AuthContext";
+
+const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 
 export default function ProfilePage() {
   const navigate = useNavigate();
-  const [user, setUser] = useState(JSON.parse(localStorage.getItem("kandjou_user") || "{}"));
+  const { token } = useAuth();
+  const [user, setUser] = useState({});
   const [activeTab, setActiveTab] = useState("Informations");
+  const [loading, setLoading] = useState(true);
   
   // States
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
-    fullname: user.fullname || "",
-    email: user.email || "",
-    address: "Madina, Commune de Matam, Conakry",
-    id_card: "CNI — 8023456789",
-    reg_date: "15/03/2024"
+    fullname: "",
+    email: "",
+    address: "",
+    id_card: "",
+    reg_date: ""
   });
   
   const [securityData, setSecurityData] = useState({
@@ -51,19 +57,45 @@ export default function ProfilePage() {
   });
 
   const [status, setStatus] = useState({ type: "", message: "" });
-  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetchProfile();
+  }, []);
+
+  const fetchProfile = async () => {
+    try {
+      const res = await axios.get(`${API}/m1/me`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setUser(res.data);
+      setFormData({
+        fullname: res.data.fullname || "",
+        email: res.data.email || "",
+        address: res.data.address || "Non renseigné",
+        id_card: res.data.id_card || "Non renseignée",
+        reg_date: res.data.created_at ? new Date(res.data.created_at).toLocaleDateString() : "---"
+      });
+    } catch (err) {
+      console.error("Error fetching profile", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSaveProfile = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => {
-      const updatedUser = { ...user, fullname: formData.fullname, email: formData.email };
-      localStorage.setItem("kandjou_user", JSON.stringify(updatedUser));
-      setUser(updatedUser);
-      setIsEditing(false);
-      setStatus({ type: "success", message: "Profil mis à jour avec succès !" });
-      setLoading(false);
-    }, 800);
+    try {
+       // On simule une mise à jour API ici (à implémenter si besoin d'un PUT /me)
+       setTimeout(() => {
+         setIsEditing(false);
+         setStatus({ type: "success", message: "Profil mis à jour (Simulation API) !" });
+         setLoading(false);
+       }, 800);
+    } catch (err) {
+       setStatus({ type: "error", message: "Erreur de mise à jour" });
+       setLoading(false);
+    }
   };
 
   const handleChangePassword = (e) => {

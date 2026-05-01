@@ -130,6 +130,11 @@ def normalize_sources(msisdn_orange: Optional[str], msisdn_mtn: Optional[str],
     return sources
 
 # ──────────────────────────────────�@router.post("/risk/threshold")
+# ─────────────────────────────────────────────────────────────────────────────
+# Seuils de Risque
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.post("/risk/threshold")
 async def update_threshold(threshold: int = Body(..., embed=True)):
     set_risk_threshold(threshold)
     return {"message": "Seuil mis à jour avec succès", "new_threshold": threshold}
@@ -195,9 +200,16 @@ async def aggregate(
     target_user = get_user_by_username(msisdn)
     if not target_user:
         raise HTTPException(status_code=404, detail="Client non trouvé")
-        
     msisdn_orange = target_user.get("msisdn_orange")
     msisdn_mtn = target_user.get("msisdn_mtn")
+    
+    # Fallback si les champs MSISDN sont vides (migration ou cas spécifique)
+    if not msisdn_orange and not msisdn_mtn:
+        clean_msisdn = msisdn.replace(" ", "").replace("+224", "")
+        if clean_msisdn.startswith("62") or clean_msisdn.startswith("61"):
+            msisdn_orange = msisdn
+        elif clean_msisdn.startswith("66") or clean_msisdn.startswith("65"):
+            msisdn_mtn = msisdn
     
     logger.info(f"📣 Agrégation autorisée | Demandeur: {primary} ({user_role}) | Cible: {msisdn}")
     
@@ -351,48 +363,82 @@ async def get_aggregated_transactions(
         "timestamp": datetime.now().isoformat()
     }
 
+@router.get("/me")
+async def get_me(token_data: Dict = Depends(require_valid_token)):
+    from modules.common.database import get_user_by_username
+    username = token_data["primary"]
+    user = get_user_by_username(username)
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+    # Sécurité: retirer le mot de passe
+    if "password" in user: del user["password"]
+    return user
+
 class UnifiedTransferRequest(BaseModel):
     operator: str
     to_msisdn: str
     amount: int
     note: Optional[str] = "Transfert Kandjou"
+    pin: Optional[str] = None
 
-@router.post("/transfer")
-async def process_transfer(
+class UnifiedDepositRequest(BaseModel):
+    operator: str
+    msisdn: str
+    amount: int
+    agent_id: str
+    client_id: Optional[str] = None
+
+@router.post("/transfer/verify")
+async def verify_transfer(
     req: UnifiedTransferRequest,
     token_data: Dict = Depends(require_valid_token)
 ):
     """
-    Route unifiée pour effectuer un transfert via le simulateur approprié.
+    Vérifie la faisabilité d'un transfert avant initiation.
+    - Existence du destinataire (simulée)
+    - Solde suffisant
+    - Calcul des frais
     """
-    from modules.M2_simulators.router import execute_simulated_transfer, TransferRequest as SimReq
-    
     msisdn_orange = token_data.get("msisdn_orange")
     msisdn_mtn = token_data.get("msisdn_mtn")
     
-    # Détermination du MSISDN source basé sur l'opérateur choisi
     from_msisdn = msisdn_orange if req.operator.upper() == "ORANGE" else msisdn_mtn
     
     if not from_msisdn:
         raise HTTPException(status_code=400, detail=f"Aucun compte {req.operator} lié à votre profil.")
 
-    # Appel direct de la fonction du simulateur (simulation interne)
-    sim_req = SimReq(
-        operator=req.operator,
-        from_msisdn=from_msisdn,
-        to_msisdn=req.to_msisdn,
-        amount=req.amount,
-        note=req.note
-    )
+    # Simulation de frais (1% pour interop, gratuit si même opérateur)
+    # Dans notre simu, on considère interop si le numéro commence par un préfixe différent
+    # Orange: 62x, 61x | MTN: 66x, 65x
+    is_orange_dest = req.to_msisdn.startswith("62") or req.to_msisdn.startswith("61") or req.to_msisdn.startswith("22462") or req.to_msisdn.startswith("22461")
+    is_mtn_dest = req.to_msisdn.startswith("66") or req.to_msisdn.startswith("65") or req.to_msisdn.startswith("22466") or req.to_msisdn.startswith("22465")
     
+    is_interop = (req.operator.upper() == "ORANGE" and is_mtn_dest) or (req.operator.upper() == "MTN" and is_orange_dest)
+    fees = round(req.amount * 0.01) if is_interop else 0
+
+    # Vérification solde
     try:
-        result = await execute_simulated_transfer(sim_req)
-        return result
-    except HTTPException as e:
-        raise e
+        if req.operator.upper() == "ORANGE":
+            bal = await fetch_orange_balance(from_msisdn)
+            current = bal["available_balance"] if bal else 0
+        else:
+            bal = await fetch_mtn_balance(from_msisdn)
+            current = bal["current_balance"] if bal else 0
+        
+        if current < (req.amount + fees):
+            raise HTTPException(status_code=400, detail="Solde insuffisant (incluant les frais éventuels).")
     except Exception as e:
-        logger.error(f"❌ Erreur transfert M1 : {e}")
-        raise HTTPException(status_code=500, detail="Erreur interne lors du transfert")
+        if isinstance(e, HTTPException): raise e
+        raise HTTPException(status_code=500, detail="Erreur lors de la vérification du solde.")
+
+    return {
+        "status": "VALID",
+        "recipient_name": "Abonné " + ("Orange" if is_orange_dest else "MTN" if is_mtn_dest else "Inconnu"),
+        "fees": fees,
+        "fee_rate": "1.0%" if is_interop else "0.5%",
+        "total_deducted": req.amount + fees,
+        "is_interop": is_interop
+    }
 
 
 
@@ -533,8 +579,8 @@ async def initiate_transfer_v2(
         "tx_id": tx_id,
         "username": username,
         "status": "INITIATED",
-        "message": "Initialisation...",
-        "progress": 10,
+        "message": "Initialisation des protocoles...",
+        "progress": 5,
         "amount": req.amount,
         "recipient": req.to_msisdn,
         "operator": req.operator,
@@ -553,20 +599,24 @@ async def initiate_transfer_v2(
 async def simulate_transfer_process(tx_id: str, req: UnifiedTransferRequest, username: str, token_data: Dict):
     from modules.M2_simulators.router import execute_simulated_transfer, TransferRequest
     try:
-        # Step 1: Validation
-        await asyncio.sleep(1.5)
-        TRANSFER_STATUS[tx_id].update({"status": "VALIDATING", "message": "Sécurité...", "progress": 30})
+        # Step 1: Validation Sécurité
+        await asyncio.sleep(1.2) # Simulation de latence réseau Afrique
+        if req.pin and req.pin != "1234": # PIN de simulation par défaut
+             TRANSFER_STATUS[tx_id].update({"status": "FAILED", "message": "Code PIN incorrect.", "progress": 100})
+             await broadcast_transaction_update(username, {"type": "UPDATE", "data": TRANSFER_STATUS[tx_id]})
+             return
+
+        TRANSFER_STATUS[tx_id].update({"status": "VALIDATING", "message": "Validation des protocoles de sécurité...", "progress": 35})
         await broadcast_transaction_update(username, {"type": "UPDATE", "data": TRANSFER_STATUS[tx_id]})
         
         # Step 2: Opérateur
-        await asyncio.sleep(2)
-        TRANSFER_STATUS[tx_id].update({"status": "PROCESSING", "message": f"Contact {req.operator}...", "progress": 60})
+        await asyncio.sleep(1.5)
+        TRANSFER_STATUS[tx_id].update({"status": "PROCESSING", "message": f"Communication avec l'opérateur {req.operator}...", "progress": 70})
         await broadcast_transaction_update(username, {"type": "UPDATE", "data": TRANSFER_STATUS[tx_id]})
         
-        # Step 3: Action réelle (Mutation en DB/Mock)
-        await asyncio.sleep(1.5)
+        # Step 3: Action réelle
+        await asyncio.sleep(1.0)
         try:
-            # Détermination du MSISDN source correct depuis la session
             if req.operator == "ORANGE":
                 from_msisdn = token_data.get("msisdn_orange") or username
             else:
@@ -577,27 +627,34 @@ async def simulate_transfer_process(tx_id: str, req: UnifiedTransferRequest, use
                 from_msisdn=from_msisdn,
                 to_msisdn=req.to_msisdn,
                 amount=req.amount,
-                note=req.note
+                note=req.note,
+                client_id=username  # Pass username for DB persistence
             )
             result = await execute_simulated_transfer(sim_req)
             
             TRANSFER_STATUS[tx_id].update({
-                "status": "SUCCESS", "message": "Terminé", "progress": 100,
+                "status": "SUCCESS", 
+                "message": "Transfert validé avec succès !", 
+                "progress": 100,
                 "details": {
                     "amount": req.amount, 
+                    "fee": result.get("fee", 0),
+                    "total_deducted": result.get("total_deducted", req.amount),
                     "recipient": req.to_msisdn, 
                     "operator": req.operator,
                     "transaction_id": result["transaction_id"],
-                    "interoperability": result["interoperability"]
+                    "interoperability": result["interoperability"],
+                    "new_balance": result.get("new_balance", 0)
                 }
             })
             
-            # Déclencher le contrôle AML pour le Régulateur
+            # Déclencher le contrôle AML
             from .audit_router import trigger_aml_check
             trigger_aml_check(tx_id, username, req.amount, f"Transfert {req.operator} vers {req.to_msisdn}")
+            
         except Exception as e:
             logger.error(f"Erreur M2 Mutation: {e}")
-            TRANSFER_STATUS[tx_id].update({"status": "FAILED", "message": str(e), "progress": 100})
+            TRANSFER_STATUS[tx_id].update({"status": "FAILED", "message": f"Erreur opérateur : {str(e)}", "progress": 100})
         
         await broadcast_transaction_update(username, {"type": "UPDATE", "data": TRANSFER_STATUS[tx_id]})
 
@@ -605,7 +662,7 @@ async def simulate_transfer_process(tx_id: str, req: UnifiedTransferRequest, use
         logger.error(f"Err simulate {tx_id}: {e}")
 
 # ... reste du fichier ...
-@router.get("/m1/analytics/{username}")
+@router.get("/analytics/{username}")
 async def get_user_analytics(username: str, token_data: Dict = Depends(require_valid_token)):
     """Calcule les agrégats financiers pour les graphiques."""
     from datetime import datetime, timedelta
@@ -632,10 +689,292 @@ async def get_user_analytics(username: str, token_data: Dict = Depends(require_v
                 else:
                     expense[idx] += tx["amount"]
         except: continue
+
+    # 4. Calcul du Score Réel via le moteur Kandjou
+    try:
+        # On réutilise la logique d'agrégation qui inclut déjà le scoring
+        agg_data = await aggregate(username, token_data=token_data)
+        real_score = agg_data["credit_analysis"]["score"]
+    except:
+        real_score = 0
         
     return {
         "labels": labels,
         "income": income,
         "expense": expense,
-        "score": 78 # Simulation d'un score dynamique
+        "score": real_score
     }
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Logique de Retrait (Withdraw / Cash-out)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class WithdrawInitiateRequest(BaseModel):
+    operator: str
+    amount: int
+    agent_id: str
+
+class WithdrawValidateRequest(BaseModel):
+    withdraw_code: str
+    agent_id: str
+
+@router.post("/withdraw/initiate")
+async def initiate_withdraw(
+    req: WithdrawInitiateRequest,
+    token_data: Dict = Depends(require_valid_token)
+):
+    """
+    Initie une demande de retrait.
+    Vérifie le solde et prépare la génération du code (OTP requis après).
+    """
+    import uuid
+    import secrets
+    import string
+    
+    username = token_data["primary"]
+    msisdn_orange = token_data.get("msisdn_orange")
+    msisdn_mtn = token_data.get("msisdn_mtn")
+    
+    from_msisdn = msisdn_orange if req.operator.upper() == "ORANGE" else msisdn_mtn
+    if not from_msisdn:
+        raise HTTPException(status_code=400, detail=f"Aucun compte {req.operator} lié.")
+
+    # Vérification solde via M2
+    try:
+        if req.operator.upper() == "ORANGE":
+            bal_data = await fetch_orange_balance(from_msisdn)
+            current_bal = bal_data["available_balance"] if bal_data else 0
+        else:
+            bal_data = await fetch_mtn_balance(from_msisdn)
+            current_bal = bal_data["current_balance"] if bal_data else 0
+            
+        if current_bal < req.amount:
+            raise HTTPException(status_code=400, detail="Solde insuffisant pour ce retrait.")
+    except Exception as e:
+        if isinstance(e, HTTPException): raise e
+        raise HTTPException(status_code=500, detail="Erreur lors de la vérification du solde.")
+
+    tx_id = f"KDJ-WD-{uuid.uuid4().hex[:8].upper()}"
+    fees = round(req.amount * 0.01) # 1% de frais simulés
+    
+    TRANSFER_STATUS[tx_id] = {
+        "tx_id": tx_id,
+        "username": username,
+        "status": "INITIATED",
+        "step": "INITIALIZATION",
+        "progress": 15,
+        "message": "Demande de retrait initiée...",
+        "amount": req.amount,
+        "fees": fees,
+        "operator": req.operator,
+        "agent_id": req.agent_id,
+        "timestamp": datetime.now().isoformat()
+    }
+    
+    return {
+        "status": "OK",
+        "transaction_id": tx_id,
+        "fees": fees
+    }
+
+@router.post("/withdraw/otp-verify")
+async def verify_withdraw_otp(
+    tx_id: str = Body(...),
+    otp_code: str = Body(...),
+    token_data: Dict = Depends(require_valid_token)
+):
+    """
+    Valide l'OTP et génère le code de retrait final.
+    """
+    import secrets
+    import string
+    from modules.common.database import get_db_connection
+    
+    if tx_id not in TRANSFER_STATUS:
+        raise HTTPException(status_code=404, detail="Transaction de retrait introuvable.")
+    
+    # Simulation validation OTP (toujours 123456 pour le dév)
+    if otp_code != "123456":
+        raise HTTPException(status_code=400, detail="Code OTP invalide.")
+        
+    username = token_data["primary"]
+    withdraw_code = "".join(secrets.choice(string.digits) for _ in range(6))
+    expires_at = (datetime.now() + timedelta(minutes=5)).isoformat()
+    
+    # Mise à jour du statut live
+    TRANSFER_STATUS[tx_id].update({
+        "status": "PROCESSING",
+        "step": "CODE_GENERATED",
+        "progress": 50,
+        "message": "Code de retrait généré. Présentez-le à votre agent.",
+        "withdraw_code": withdraw_code,
+        "expires_at": expires_at
+    })
+    
+    # Enregistrement en base (Transaction en attente)
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO transactions (tx_id, client_id, operator, type, amount, description, status, withdraw_code, withdraw_expires_at)
+            VALUES (?, ?, ?, 'WITHDRAW', ?, ?, 'PENDING', ?, ?)
+        """, (
+            tx_id, 
+            username, 
+            TRANSFER_STATUS[tx_id]["operator"], 
+            TRANSFER_STATUS[tx_id]["amount"], 
+            f"Retrait Cash-out (Agent: {TRANSFER_STATUS[tx_id]['agent_id']})",
+            withdraw_code,
+            expires_at
+        ))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logger.error(f"Erreur DB withdraw: {e}")
+        # On continue quand même car l'état est en mémoire pour le WebSocket
+    
+    await broadcast_transaction_update(username, {"type": "UPDATE", "data": TRANSFER_STATUS[tx_id]})
+    
+    return {
+        "status": "SUCCESS",
+        "withdraw_code": withdraw_code,
+        "expires_at": expires_at
+    }
+
+@router.post("/withdraw/validate")
+async def validate_withdraw_agent(req: WithdrawValidateRequest):
+    """
+    Endpoint utilisé par l'AGENT pour finaliser le retrait.
+    """
+    from modules.common.database import get_db_connection
+    from modules.M2_simulators.router import execute_simulated_withdraw, WithdrawRequest
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Trouver la transaction correspondante
+        cursor.execute("""
+            SELECT * FROM transactions 
+            WHERE withdraw_code = ? AND status = 'PENDING'
+        """, (req.withdraw_code,))
+        tx = cursor.fetchone()
+        
+        if not tx:
+            conn.close()
+            raise HTTPException(status_code=404, detail="Code de retrait invalide ou déjà utilisé.")
+        
+        # Vérification expiration
+        if datetime.now() > datetime.fromisoformat(tx["withdraw_expires_at"]):
+            cursor.execute("UPDATE transactions SET status = 'EXPIRED' WHERE tx_id = ?", (tx["tx_id"],))
+            conn.commit()
+            conn.close()
+            raise HTTPException(status_code=400, detail="Code de retrait expiré.")
+
+        # Action sur le simulateur (Débit réel)
+        username = tx["client_id"]
+        target_user = get_user_by_username(username)
+        msisdn = target_user.get("msisdn_orange") if tx["operator"] == "ORANGE" else target_user.get("msisdn_mtn")
+        
+        try:
+            sim_res = await execute_simulated_withdraw(WithdrawRequest(
+                operator=tx["operator"],
+                msisdn=msisdn,
+                amount=int(tx["amount"]),
+                agent_id=req.agent_id
+            ))
+            
+            # Mise à jour finale en base
+            cursor.execute("UPDATE transactions SET status = 'SUCCESS' WHERE tx_id = ?", (tx["tx_id"],))
+            conn.commit()
+            
+            # Notification WebSocket au client
+            tx_id = tx["tx_id"]
+            if tx_id in TRANSFER_STATUS:
+                TRANSFER_STATUS[tx_id].update({
+                    "status": "SUCCESS",
+                    "step": "COMPLETED",
+                    "progress": 100,
+                    "message": "Retrait effectué ! Récupérez vos espèces.",
+                    "agent_id": req.agent_id
+                })
+                await broadcast_transaction_update(username, {"type": "UPDATE", "data": TRANSFER_STATUS[tx_id]})
+            
+            conn.close()
+            return {"status": "SUCCESS", "message": "Retrait validé", "transaction_id": tx_id}
+            
+        except Exception as e:
+            conn.close()
+            logger.error(f"Erreur simulation withdraw: {e}")
+            raise HTTPException(status_code=500, detail="Erreur lors de la communication avec l'opérateur.")
+            
+    except Exception as e:
+        if isinstance(e, HTTPException): raise e
+        logger.error(f"Erreur validate_withdraw: {e}")
+        raise HTTPException(status_code=500, detail="Erreur interne serveur.")
+
+# --- Gestion des Favoris ---
+
+@router.get("/favorites")
+async def get_favorites(token_data: Dict = Depends(require_valid_token)):
+    from modules.common.database import get_user_favorites
+    username = token_data["primary"]
+    favs = get_user_favorites(username)
+    return {"favorites": favs}
+
+class FavoriteRequest(BaseModel):
+    name: str
+    msisdn: str
+    operator: str
+
+@router.post("/favorites")
+async def add_fav(req: FavoriteRequest, token_data: Dict = Depends(require_valid_token)):
+    from modules.common.database import add_favorite
+    username = token_data["primary"]
+    success = add_favorite(username, req.name, req.msisdn, req.operator)
+    if not success:
+        raise HTTPException(status_code=500, detail="Erreur lors de l'ajout du favori")
+    return {"status": "success"}
+
+@router.post("/deposit")
+async def perform_deposit(
+    req: UnifiedDepositRequest,
+    token_data: Dict = Depends(require_valid_token)
+):
+    """
+    Effectue un dépôt (Cash-in) pour un client.
+    Réservé aux Agents ou Admins.
+    """
+    from modules.M2_simulators.router import execute_simulated_deposit, DepositRequest
+    
+    role = token_data.get("role")
+    if role not in ["Administrateur", "Agent de Crédit"]:
+        raise HTTPException(status_code=403, detail="Seuls les agents peuvent effectuer des dépôts.")
+        
+    sim_req = DepositRequest(
+        operator=req.operator,
+        msisdn=req.msisdn,
+        amount=req.amount,
+        agent_id=req.agent_id,
+        client_id=req.client_id
+    )
+    
+    result = await execute_simulated_deposit(sim_req)
+    
+    # Notifier le client instantanément via WebSocket
+    client_username = req.client_id or req.msisdn
+    await broadcast_transaction_update(client_username, {
+        "type": "NEW_TRANSACTION",
+        "data": {
+            "tx_id": result["transaction_id"],
+            "type": "DEPOSIT",
+            "status": "SUCCESS",
+            "message": f"Dépôt de {req.amount:,} GNF reçu !",
+            "amount": req.amount,
+            "operator": req.operator,
+            "recipient": "Moi",
+            "timestamp": datetime.now().isoformat()
+        }
+    })
+    
+    return result

@@ -66,128 +66,133 @@ export default function TransactionsPage() {
   }, [filtered]);
 
   return (
-    <div style={{ maxWidth: 1000, margin: "0 auto", padding: "0 20px" }}>
+    <div className="transactions-content">
 
-      <header style={{ marginBottom: "2rem", display: "flex", alignItems: "center", gap: "1rem", paddingTop: "2rem" }}>
-        <button onClick={() => navigate("/dashboard")} style={{
-          width: 40, height: 40, background: "#fff", border: "1px solid #E2E8F0",
-          borderRadius: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center"
-        }}>
-          <ArrowLeft size={18} color="#64748B" />
-        </button>
-        <div>
-          <h1 style={{ fontSize: "1.6rem", fontWeight: 900, color: "#1E293B", letterSpacing: "-1px", margin: 0 }}>Historique des transactions</h1>
-          <p style={{ color: "#64748B", fontSize: "0.85rem", fontWeight: 600, margin: 0 }}>Gérez et analysez vos flux Orange et MTN</p>
-        </div>
+      <div style={{ marginBottom: "2.5rem" }}>
+        <h1 style={{ fontSize: "2rem", fontWeight: 950, color: "#1E293B", letterSpacing: "-1px", margin: 0 }}>Historique complet</h1>
+        <p style={{ color: "#64748B", fontSize: "0.85rem", fontWeight: 600, margin: 0 }}>Consolidation Orange Money & MTN MoMo</p>
+      </div>
 
-        <button onClick={fetchTransactions} style={{
-          marginLeft: "auto", background: "#fff", border: "1px solid #E2E8F0", padding: "0.6rem 1rem",
-          borderRadius: 12, fontSize: "0.75rem", fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", gap: 8
-        }}>
-          <RefreshCw size={14} className={loading ? "spin-animate" : ""} />
-          Actualiser
-        </button>
-      </header>
-
-      <div style={{
-        background: "#fff", borderRadius: 24, padding: "2rem",
-        marginBottom: "2.5rem", border: "1px solid #E2E8F0",
-        boxShadow: "0 10px 25px rgba(0,0,0,0.03)"
-      }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1.5rem" }}>
+      <div className="filters-card">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1.5rem" }}>
           <div>
-            <label style={{ display: "block", fontSize: "0.65rem", fontWeight: 900, color: "#94A3B8", textTransform: "uppercase", marginBottom: 8 }}>Opérateur</label>
-            <div style={{ display: "flex", gap: 6 }}>
+            <label className="filter-label">Filtrer par opérateur</label>
+            <div className="op-filter-group">
               {["all", "orange", "mtn"].map(op => (
-                <button key={op} onClick={() => setOpFilter(op)} style={{
-                  flex: 1, padding: "8px", borderRadius: 10, fontSize: "0.7rem", fontWeight: 800,
-                  textTransform: "capitalize", cursor: "pointer", border: "1px solid",
-                  background: opFilter === op ? "#006233" : "#fff",
-                  color: opFilter === op ? "#fff" : "#64748B",
-                  borderColor: opFilter === op ? "#006233" : "#E2E8F0"
-                }}>{op}</button>
+                <button key={op} onClick={() => setOpFilter(op)} className={`op-btn ${opFilter === op ? 'active' : ''}`}>
+                  {op}
+                </button>
               ))}
             </div>
           </div>
 
           <div>
-            <label style={{ display: "block", fontSize: "0.65rem", fontWeight: 900, color: "#94A3B8", textTransform: "uppercase", marginBottom: 8 }}>Recherche</label>
+            <label className="filter-label">Recherche rapide</label>
             <div style={{ position: "relative" }}>
-              <Search size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#94A3B8" }} />
+              <Search size={16} className="search-icon" />
               <input 
                 type="text" 
-                placeholder="N°, montant..." 
+                placeholder="Montant, bénéficiaire..." 
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                style={{
-                  width: "100%", padding: "10px 10px 10px 35px", borderRadius: 12, border: "1.5px solid #F1F5F9",
-                  background: "#F8FAFC", fontSize: "0.85rem", fontWeight: 600, outline: "none"
-                }}
+                className="search-input"
               />
             </div>
+          </div>
+          
+          <div style={{ display: "flex", alignItems: "flex-end" }}>
+             <button onClick={fetchTransactions} className="refresh-btn">
+                <RefreshCw size={16} className={loading ? "spin-animate" : ""} />
+                Actualiser la liste
+             </button>
           </div>
         </div>
       </div>
 
       {loading ? (
-        <div style={{ textAlign: "center", padding: "4rem" }}>
-          <RefreshCw size={30} className="spin-animate" color="#006233" />
+        <div className="loader-box">
+          <RefreshCw size={32} className="spin-animate" color="#006233" />
         </div>
       ) : (
-        <div style={{ background: "#fff", borderRadius: 24, border: "1px solid #E2E8F0", overflow: "hidden" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <div className="tx-table-container">
+          <table className="tx-table">
             <thead>
-              <tr style={{ background: "#F8FAFC", borderBottom: "1px solid #E2E8F0" }}>
-                <th style={{ padding: "1rem", textAlign: "left", fontSize: "0.65rem", fontWeight: 900, color: "#94A3B8", textTransform: "uppercase" }}>Type</th>
-                <th style={{ padding: "1rem", textAlign: "left", fontSize: "0.65rem", fontWeight: 900, color: "#94A3B8", textTransform: "uppercase" }}>Destinataire</th>
-                <th style={{ padding: "1rem", textAlign: "left", fontSize: "0.65rem", fontWeight: 900, color: "#94A3B8", textTransform: "uppercase" }}>Montant</th>
-                <th style={{ padding: "1rem", textAlign: "left", fontSize: "0.65rem", fontWeight: 900, color: "#94A3B8", textTransform: "uppercase" }}>Statut</th>
+              <tr>
+                <th>Type</th>
+                <th>Détails & Opérateur</th>
+                <th>Montant (GNF)</th>
+                <th>État</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((tx, idx) => (
-                <tr key={idx} style={{ borderBottom: "1px solid #F1F5F9" }}>
-                  <td style={{ padding: "1rem" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <div style={{ 
-                        width: 32, height: 32, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center",
-                        background: tx.type === "CREDIT" ? "#F0FDF4" : "#FEF2F2"
-                      }}>
-                        {tx.type === "CREDIT" ? <ArrowDownLeft size={16} color="#15803D" /> : <ArrowUpRight size={16} color="#B91C1C" />}
+                <tr key={idx}>
+                  <td>
+                    <div className="tx-type-cell">
+                      <div className={`tx-arrow-icon ${tx.type === "CREDIT" ? 'in' : 'out'}`}>
+                        {tx.type === "CREDIT" ? <ArrowDownLeft size={18} /> : <ArrowUpRight size={18} />}
                       </div>
-                      <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "#1E293B" }}>{tx.type === "CREDIT" ? "Reçu" : "Envoyé"}</span>
+                      <span className="tx-type-text">{tx.type === "CREDIT" ? "Entrant" : "Sortant"}</span>
                     </div>
                   </td>
-                  <td style={{ padding: "1rem" }}>
-                    <p style={{ fontSize: "0.85rem", fontWeight: 700, color: "#1E293B", margin: 0 }}>{tx.receiver}</p>
-                    <p style={{ fontSize: "0.65rem", fontWeight: 600, color: "#94A3B8", margin: 0, textTransform: "capitalize" }}>{tx.operator}</p>
+                  <td>
+                    <p className="tx-receiver">{tx.receiver || "N/A"}</p>
+                    <p className="tx-meta-op">{tx.operator} • {new Date(tx.date).toLocaleDateString()}</p>
                   </td>
-                  <td style={{ padding: "1rem" }}>
-                    <span style={{ fontSize: "0.9rem", fontWeight: 900, color: tx.type === "CREDIT" ? "#15803D" : "#B91C1C" }}>
-                      {tx.type === "CREDIT" ? "+" : "-"} {tx.amount.toLocaleString()} GNF
+                  <td>
+                    <span className={`tx-amount-val ${tx.type === "CREDIT" ? 'positive' : 'negative'}`}>
+                      {tx.type === "CREDIT" ? "+" : "-"} {tx.amount.toLocaleString()}
                     </span>
                   </td>
-                  <td style={{ padding: "1rem" }}>
-                    <span style={{
-                      fontSize: "0.65rem", fontWeight: 900, padding: "4px 10px", borderRadius: 20,
-                      background: tx.status === "SUCCESS" ? "#F0FDF4" : "#FFFBEB",
-                      color: tx.status === "SUCCESS" ? "#15803D" : "#B45309"
-                    }}>{tx.status === "SUCCESS" ? "Complété" : "En attente"}</span>
+                  <td>
+                    <span className={`tx-status-pill ${tx.status.toLowerCase()}`}>
+                      {tx.status === "SUCCESS" ? "Validé" : "En cours"}
+                    </span>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          {filtered.length === 0 && (
+            <div className="empty-state">
+               <Clock size={40} color="#CBD5E1" />
+               <p>Aucune transaction correspondante.</p>
+            </div>
+          )}
         </div>
       )}
 
-      <footer style={{ marginTop: "2.5rem", textAlign: "center", paddingBottom: "2rem" }}>
-        <p style={{ fontSize: "0.7rem", fontWeight: 700, color: "#CBD5E1", textTransform: "uppercase", letterSpacing: 2 }}>
-          Historique consolidé • Données certifiées Orange & MTN
-        </p>
-      </footer>
-
       <style>{`
+        .transactions-content { width: 100%; }
+        .filters-card { background: #fff; border-radius: 24px; padding: 1.8rem; border: 1.5px solid #F1F5F9; margin-bottom: 2rem; box-shadow: 0 10px 30px rgba(0,0,0,0.02); }
+        .filter-label { display: block; fontSize: 0.7rem; font-weight: 900; color: #94A3B8; text-transform: uppercase; margin-bottom: 12px; letter-spacing: 1px; }
+        .op-filter-group { display: flex; gap: 8px; background: #F8FAFC; padding: 4px; border-radius: 12px; border: 1px solid #F1F5F9; }
+        .op-btn { flex: 1; padding: 8px; border: none; border-radius: 8px; font-size: 0.75rem; font-weight: 800; cursor: pointer; transition: 0.2s; text-transform: capitalize; color: #64748B; background: transparent; }
+        .op-btn.active { background: #fff; color: #006233; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #94A3B8; }
+        .search-input { width: 100%; padding: 12px 12px 12px 42px; border-radius: 14px; border: 1.5px solid #F1F5F9; background: #F8FAFC; font-size: 0.9rem; font-weight: 600; outline: none; transition: 0.2s; }
+        .search-input:focus { border-color: #006233; background: #fff; }
+        .refresh-btn { background: #006233; color: #fff; border: none; padding: 0 1.5rem; height: 46px; border-radius: 14px; font-size: 0.8rem; font-weight: 800; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: 0.2s; }
+        .refresh-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,98,51,0.2); }
+        .tx-table-container { background: #fff; border-radius: 28px; border: 1.5px solid #F1F5F9; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.02); }
+        .tx-table { width: 100%; border-collapse: collapse; }
+        .tx-table th { background: #F8FAFC; padding: 1.2rem; text-align: left; font-size: 0.7rem; font-weight: 900; color: #94A3B8; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1.5px solid #F1F5F9; }
+        .tx-table td { padding: 1.4rem 1.2rem; border-bottom: 1px solid #F8FAFC; vertical-align: middle; }
+        .tx-type-cell { display: flex; align-items: center; gap: 12px; }
+        .tx-arrow-icon { width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
+        .tx-arrow-icon.in { background: #DCFCE7; color: #10B981; }
+        .tx-arrow-icon.out { background: #FEE2E2; color: #EF4444; }
+        .tx-type-text { font-size: 0.9rem; font-weight: 800; color: #1E293B; }
+        .tx-receiver { font-size: 0.95rem; font-weight: 850; color: #1E293B; margin: 0; }
+        .tx-meta-op { font-size: 0.75rem; font-weight: 600; color: #94A3B8; margin: 2px 0 0; }
+        .tx-amount-val { font-size: 1.1rem; font-weight: 900; }
+        .tx-amount-val.positive { color: #10B981; }
+        .tx-amount-val.negative { color: #1E293B; }
+        .tx-status-pill { font-size: 0.7rem; font-weight: 900; padding: 6px 14px; border-radius: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .tx-status-pill.success { background: #ECFDF5; color: #059669; }
+        .tx-status-pill.pending { background: #FFFBEB; color: #D97706; }
+        .empty-state { padding: 5rem; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 1rem; color: #94A3B8; font-weight: 700; }
+        .loader-box { padding: 5rem; display: flex; justify-content: center; }
         .spin-animate { animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
       `}</style>

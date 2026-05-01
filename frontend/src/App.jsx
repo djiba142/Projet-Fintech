@@ -14,9 +14,10 @@ import RiskDashboard from "./pages/RiskDashboard";
 import AuditPage from "./pages/AuditPage";
 import ClientDetailPage from "./pages/ClientDetailPage";
 import NotificationsPage from "./pages/NotificationsPage";
+import MainLayout from "./components/MainLayout";
 
-// HOC pour protéger les routes
-const LayoutRoute = ({ children, allowedRoles }) => {
+// HOC pour protéger les routes et appliquer le Layout
+const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, isAuthenticated, loading } = useAuth();
   
   if (loading) return (
@@ -30,7 +31,7 @@ const LayoutRoute = ({ children, allowedRoles }) => {
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (allowedRoles && !allowedRoles.includes(user.role)) return <Navigate to="/" replace />;
   
-  return children;
+  return <MainLayout>{children}</MainLayout>;
 };
 
 export default function App() {
@@ -38,68 +39,71 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <Routes>
-          {/* Pages Publiques */}
+          {/* Pages Publiques (Sans Sidebar) */}
           <Route path="/"         element={<LandingPage />} />
           <Route path="/login"    element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
 
-          {/* Accès Client */}
+          {/* Routes Protégées (Avec Sidebar/Header via MainLayout) */}
           <Route path="/dashboard" element={
-            <LayoutRoute allowedRoles={["Client", "Administrateur"]}>
+            <ProtectedRoute allowedRoles={["Client", "Administrateur"]}>
               <ClientDashboard />
-            </LayoutRoute>
+            </ProtectedRoute>
           } />
           <Route path="/transactions" element={
-            <LayoutRoute allowedRoles={["Client", "Administrateur"]}>
+            <ProtectedRoute allowedRoles={["Client", "Administrateur"]}>
               <TransactionsPage />
-            </LayoutRoute>
+            </ProtectedRoute>
           } />
           <Route path="/transfers" element={
-            <LayoutRoute allowedRoles={["Client"]}>
+            <ProtectedRoute allowedRoles={["Client"]}>
               <TransferPage />
-            </LayoutRoute>
+            </ProtectedRoute>
           } />
-          <Route path="/scoring" element={
-            <LayoutRoute allowedRoles={["Client", "Analyste Risque"]}>
+          <Route path="/score" element={
+            <ProtectedRoute allowedRoles={["Client", "Analyste Risque"]}>
               <ScorePage />
-            </LayoutRoute>
+            </ProtectedRoute>
           } />
+          {/* Note: In App.jsx line 62 it was /scoring, but MainLayout uses /score. Harmonizing to /score */}
+          <Route path="/scoring" element={<Navigate to="/score" replace />} />
+
           <Route path="/profile" element={
-            <LayoutRoute>
+            <ProtectedRoute>
               <ProfilePage />
-            </LayoutRoute>
+            </ProtectedRoute>
           } />
           <Route path="/notifications" element={
-            <LayoutRoute>
+            <ProtectedRoute>
               <NotificationsPage />
-            </LayoutRoute>
+            </ProtectedRoute>
           } />
 
           {/* Accès Admin / Staff */}
           <Route path="/admin" element={
-            <LayoutRoute allowedRoles={["Administrateur"]}>
+            <ProtectedRoute allowedRoles={["Administrateur"]}>
               <AdminDashboard />
-            </LayoutRoute>
+            </ProtectedRoute>
           } />
           <Route path="/agent" element={
-            <LayoutRoute allowedRoles={["Agent de Crédit", "Administrateur"]}>
+            <ProtectedRoute allowedRoles={["Agent de Crédit", "Administrateur"]}>
               <AgentDashboard />
-            </LayoutRoute>
+            </ProtectedRoute>
           } />
           <Route path="/risk" element={
-            <LayoutRoute allowedRoles={["Analyste Risque", "Administrateur"]}>
+            <ProtectedRoute allowedRoles={["Analyste Risque", "Administrateur"]}>
               <RiskDashboard />
-            </LayoutRoute>
+            </ProtectedRoute>
           } />
           <Route path="/audit" element={
-            <Route allowedRoles={["Régulateur (BCRG)", "Administrateur"]}>
+            <ProtectedRoute allowedRoles={["Régulateur (BCRG)", "Administrateur"]}>
               <AuditPage />
-            </Route>
+            </ProtectedRoute>
           } />
           <Route path="/client/:id" element={
-            <LayoutRoute allowedRoles={["Administrateur", "Agent de Crédit", "Analyste Risque"]}>
+            <ProtectedRoute allowedRoles={["Administrateur", "Agent de Crédit", "Analyste Risque"]}>
               <ClientDetailPage />
-            </LayoutRoute>
+            </ProtectedRoute>
           } />
 
           <Route path="*" element={<Navigate to="/" replace />} />
@@ -108,3 +112,4 @@ export default function App() {
     </BrowserRouter>
   );
 }
+

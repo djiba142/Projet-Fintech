@@ -135,15 +135,37 @@ class RegisterRequest(BaseModel):
     password: str
     fullname: str
     email: Optional[str] = None
+    address: Optional[str] = "Conakry, Guinée"
     language: Optional[str] = "FR"
 
 @router.post("/auth/register")
 async def register(req: RegisterRequest):
     from modules.common.database import create_user
-    res = create_user(req.username, req.password, "Client", req.fullname, req.email, req.language)
+    
+    # Détection automatique de l'opérateur par défaut pour le numéro principal
+    msisdn_orange = None
+    msisdn_mtn = None
+    
+    clean_phone = req.username.replace(" ", "").replace("+224", "")
+    if clean_phone.startswith("62") or clean_phone.startswith("61"):
+        msisdn_orange = req.username
+    elif clean_phone.startswith("66") or clean_phone.startswith("65"):
+        msisdn_mtn = req.username
+        
+    res = create_user(
+        username=req.username, 
+        password=req.password, 
+        role="Client", 
+        fullname=req.fullname, 
+        email=req.email,
+        msisdn_orange=msisdn_orange,
+        msisdn_mtn=msisdn_mtn,
+        address=req.address,
+        language=req.language
+    )
     if "error" in res:
         raise HTTPException(status_code=400, detail=res["error"])
-    logger.info(f"Nouvel utilisateur cree : {req.username}")
+    logger.info(f"Nouvel utilisateur créé avec succès : {req.username}")
     return {"message": "Utilisateur créé avec succès", "username": req.username}
 
 class ResetPasswordRequest(BaseModel):
