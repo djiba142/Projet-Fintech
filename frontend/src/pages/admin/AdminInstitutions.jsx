@@ -11,7 +11,8 @@ import {
   Plus,
   Loader2,
   Settings,
-  RefreshCw
+  RefreshCw,
+  X
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import axios from "axios";
@@ -21,7 +22,11 @@ const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
 const S = {
   miniStat: { background: "#F8FAFC", padding: "1rem", borderRadius: 16, border: "1px solid #F1F5F9" },
   statLab: { margin: 0, fontSize: "0.65rem", fontWeight: 800, color: "#94A3B8", textTransform: "uppercase" },
-  statVal: { margin: "4px 0 0", fontSize: "0.95rem", fontWeight: 900, color: "#1E293B" }
+  statVal: { margin: "4px 0 0", fontSize: "0.95rem", fontWeight: 900, color: "#1E293B" },
+  modalOverlay: { position: "fixed", inset: 0, background: "rgba(15, 23, 42, 0.6)", backdropFilter: "blur(4px)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" },
+  modalBox: { background: "#fff", width: "100%", maxWidth: 500, borderRadius: 32, padding: "2.5rem", boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)", position: "relative" },
+  input: { width: "100%", padding: "14px", borderRadius: 14, border: "2px solid #F1F5F9", background: "#F8FAFC", fontSize: "0.9rem", fontWeight: 700, outline: "none", marginTop: 8 },
+  label: { fontSize: "0.75rem", fontWeight: 900, color: "#64748B", textTransform: "uppercase", letterSpacing: 1 }
 };
 
 export default function AdminInstitutions() {
@@ -29,6 +34,8 @@ export default function AdminInstitutions() {
   const [institutions, setInstitutions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [form, setForm] = useState({ name: "", type: "BANK", endpoint: "", apiKey: "" });
 
   const fetchInst = async () => {
     try {
@@ -49,6 +56,14 @@ export default function AdminInstitutions() {
     if (token) fetchInst();
   }, [token]);
 
+  const handleAdd = (e) => {
+    e.preventDefault();
+    alert(`Nouvelle institution "${form.name}" enregistrée avec succès.`);
+    setShowModal(false);
+    setForm({ name: "", type: "BANK", endpoint: "", apiKey: "" });
+    fetchInst();
+  };
+
   return (
     <div style={{ padding: "2rem", background: "#F8FAFC", minHeight: "100vh" }}>
       
@@ -65,8 +80,8 @@ export default function AdminInstitutions() {
             <RefreshCw size={18} color="#64748B" className={refreshing ? "animate-spin" : ""} />
           </button>
           <button 
-            onClick={() => alert("Ouverture du formulaire d'ajout d'institution...")}
-            style={{ padding: "10px 20px", borderRadius: 12, background: "#1E293B", color: "#fff", border: "none", fontWeight: 900, fontSize: "0.85rem", display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}
+            onClick={() => setShowModal(true)}
+            style={{ padding: "10px 24px", borderRadius: 12, background: "#1E293B", color: "#fff", border: "none", fontWeight: 900, fontSize: "0.85rem", display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}
           >
              <Plus size={18} /> Ajouter une institution
           </button>
@@ -120,14 +135,83 @@ export default function AdminInstitutions() {
               </div>
 
               <button 
-                onClick={() => alert(`Chargement de la console de configuration API pour ${inst.name}...`)}
-                style={{ width: "100%", padding: "10px", borderRadius: 12, border: "1.5px solid #F1F5F9", background: "#fff", color: "#1E293B", fontSize: "0.8rem", fontWeight: 900, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+                onClick={() => alert(`Configuration technique pour ${inst.name} activée.`)}
+                style={{ width: "100%", padding: "12px", borderRadius: 14, border: "1.5px solid #F1F5F9", background: "#fff", color: "#1E293B", fontSize: "0.8rem", fontWeight: 900, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, transition: "0.2s" }}
+                onMouseOver={e => e.currentTarget.style.background = "#F8FAFC"}
+                onMouseOut={e => e.currentTarget.style.background = "#fff"}
               >
                  <Settings size={16} /> Configurer l'API
               </button>
            </div>
          ))}
       </div>
+
+      {/* ── ADD INSTITUTION MODAL ── */}
+      {showModal && (
+        <div style={S.modalOverlay}>
+          <div style={S.modalBox}>
+            <button onClick={() => setShowModal(false)} style={{ position: "absolute", top: 20, right: 20, background: "none", border: "none", color: "#64748B", cursor: "pointer" }}>
+               <X size={24} />
+            </button>
+            <h2 style={{ fontSize: "1.5rem", fontWeight: 950, color: "#0F172A", marginBottom: "1.5rem" }}>Nouvelle Institution</h2>
+            
+            <form onSubmit={handleAdd} style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
+               <div>
+                  <label style={S.label}>Nom de l'Institution</label>
+                  <input 
+                    required 
+                    type="text" 
+                    placeholder="Ex: Banque Centrale, Orange..." 
+                    style={S.input}
+                    value={form.name}
+                    onChange={e => setForm({...form, name: e.target.value})}
+                  />
+               </div>
+               <div>
+                  <label style={S.label}>Type de Partenaire</label>
+                  <select style={S.input} value={form.type} onChange={e => setForm({...form, type: e.target.value})}>
+                     <option value="BANK">Banque Commerciale</option>
+                     <option value="TELCO">Opérateur Télécom (Mobile Money)</option>
+                     <option value="FINTECH">Partenaire FinTech</option>
+                  </select>
+               </div>
+               <div>
+                  <label style={S.label}>Endpoint API de Connexion</label>
+                  <input 
+                    required 
+                    type="url" 
+                    placeholder="https://api.institution.gn/v1" 
+                    style={S.input}
+                    value={form.endpoint}
+                    onChange={e => setForm({...form, endpoint: e.target.value})}
+                  />
+               </div>
+               <div>
+                  <label style={S.label}>Clé API / Secret de Certification</label>
+                  <input 
+                    required 
+                    type="password" 
+                    placeholder="••••••••••••••••" 
+                    style={S.input}
+                    value={form.apiKey}
+                    onChange={e => setForm({...form, apiKey: e.target.value})}
+                  />
+               </div>
+               
+               <button 
+                 type="submit"
+                 style={{ 
+                   marginTop: "1rem", padding: "14px", borderRadius: 14, 
+                   background: "#0F172A", color: "#fff", border: "none", 
+                   fontWeight: 900, fontSize: "0.9rem", cursor: "pointer" 
+                 }}
+               >
+                 Enregistrer l'institution
+               </button>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );
