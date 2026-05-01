@@ -37,7 +37,12 @@ def init_db():
             msisdn_orange VARCHAR(20),
             msisdn_mtn VARCHAR(20),
             language VARCHAR(10) DEFAULT 'FR',
-            status VARCHAR(20) DEFAULT 'active'
+            status VARCHAR(20) DEFAULT 'active',
+            institution VARCHAR(100),
+            department VARCHAR(100),
+            access_level VARCHAR(50),
+            audit_level VARCHAR(50),
+            must_change_password INTEGER DEFAULT 1
         )
     """)
     
@@ -225,7 +230,7 @@ def set_risk_threshold(threshold: int):
 def get_all_users():
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT username, role, fullname, status FROM users")
+    cursor.execute("SELECT username, role, fullname, status, email, institution, department, access_level, audit_level FROM users")
     rows = cursor.fetchall()
     conn.close()
     return [dict(r) for r in rows]
@@ -268,14 +273,14 @@ def get_system_config():
     conn.close()
     return {r["config_key"]: r["config_value"] for r in rows}
 
-def create_user(username: str, password: str, role: str, fullname: str, email: str = None, language: str = "FR"):
+def create_user(username: str, password: str, role: str, fullname: str, email: str = None, institution: str = None, department: str = None, access_level: str = None, audit_level: str = None):
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT INTO users (username, password, role, fullname, email, language, status)
-            VALUES (?, ?, ?, ?, ?, ?, 'active')
-        """, (username, password, role, fullname, email, language))
+            INSERT INTO users (username, password, role, fullname, email, status, institution, department, access_level, audit_level, must_change_password)
+            VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, 1)
+        """, (username, password, role, fullname, email, institution, department, access_level, audit_level))
         conn.commit()
         conn.close()
         return {"username": username, "status": "created"}

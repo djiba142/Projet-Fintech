@@ -25,6 +25,10 @@ class UserCreateRequest(BaseModel):
     role: str
     fullname: str
     email: Optional[str] = None
+    institution: Optional[str] = None
+    department: Optional[str] = None
+    access_level: Optional[str] = None
+    audit_level: Optional[str] = None
 
 class ConfigUpdateRequest(BaseModel):
     key: str
@@ -101,7 +105,22 @@ async def get_admin_users(token_data: Dict = Depends(require_valid_token)):
 @router.post("/users")
 async def admin_create_user(req: UserCreateRequest, token_data: Dict = Depends(require_valid_token)):
     check_admin(token_data)
-    res = create_user(req.username, req.password, req.role, req.fullname, req.email)
+    
+    # Sécurité: Interdire à l'admin de créer des clients
+    if req.role == "Client":
+        raise HTTPException(status_code=400, detail="L'administrateur ne peut pas créer de compte Client. Les clients doivent s'inscrire via le portail public.")
+
+    res = create_user(
+        req.username, 
+        req.password, 
+        req.role, 
+        req.fullname, 
+        req.email,
+        institution=req.institution,
+        department=req.department,
+        access_level=req.access_level,
+        audit_level=req.audit_level
+    )
     if "error" in res:
         raise HTTPException(status_code=400, detail=res["error"])
     return res
