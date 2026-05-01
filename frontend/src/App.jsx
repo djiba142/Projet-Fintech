@@ -19,7 +19,14 @@ import NotificationsPage from "./pages/NotificationsPage";
 const LayoutRoute = ({ children, allowedRoles }) => {
   const { user, isAuthenticated, loading } = useAuth();
   
-  if (loading) return <div style={{display:'flex', height:'100vh', alignItems:'center', justifyContent:'center'}}>Chargement...</div>;
+  if (loading) return (
+    <div style={{display:'flex', height:'100vh', flexDirection:'column', alignItems:'center', justifyContent:'center', background:'#F8FAFC'}}>
+       <div className="spinner" style={{width: 50, height: 50, border: '5px solid #E2E8F0', borderTopColor: '#006233', borderRadius: '50%', animation: 'spin 1s linear infinite'}} />
+       <p style={{marginTop: 20, fontWeight: 900, color: '#1E293B'}}>Initialisation de Kandjou...</p>
+       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (allowedRoles && !allowedRoles.includes(user.role)) return <Navigate to="/" replace />;
   
@@ -85,9 +92,9 @@ export default function App() {
             </LayoutRoute>
           } />
           <Route path="/audit" element={
-            <LayoutRoute allowedRoles={["Régulateur (BCRG)", "Administrateur"]}>
+            <Route allowedRoles={["Régulateur (BCRG)", "Administrateur"]}>
               <AuditPage />
-            </LayoutRoute>
+            </Route>
           } />
           <Route path="/client/:id" element={
             <LayoutRoute allowedRoles={["Administrateur", "Agent de Crédit", "Analyste Risque"]}>
